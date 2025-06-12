@@ -2,25 +2,13 @@ import ast, json, os
 
 def convert_binop(binop_node, temp_name, tempi = 0):
     """
-    Converts a compound BinOp node into a list of AugAssign statements using a temporary variable.
-    
-    Args:
-        binop_node (ast.BinOp): The BinOp node to convert
-        temp_name (str): Name for the temporary variable
-        
-    Returns:
-        tuple: (list of statements, final expression node)
+    Converts a compound BinOp node into a list of AugAssign statements
     """
-    # Define supported operators
-    allowed_ops = {
-        ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod
-    }
 
     # Check if operator is supported
-    if type(binop_node.op) not in allowed_ops:
+    if type(binop_node.op) not in [ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod]:
         return [], binop_node
 
-    # Flatten the BinOp into operands
     def flatten(node, op_type):
         if isinstance(node, ast.BinOp) and type(node.op) is op_type:
             return flatten(node.left, op_type) + [node.right]
@@ -28,7 +16,6 @@ def convert_binop(binop_node, temp_name, tempi = 0):
 
     operands = flatten(binop_node, type(binop_node.op))
     
-    # Handle case with insufficient operands
     if len(operands) < 2:
         return [], binop_node
 
