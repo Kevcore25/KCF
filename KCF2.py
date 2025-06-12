@@ -40,41 +40,36 @@ class KCF:
     """
     Converts parsed KCF into a list of MCFunction files
     """
-    labels = {}
-
-    namespace = 'kcf'
-
-    # PRESET CODE
-    files = {
-        # Typical functions
-        "load": "scoreboard objectives add onfuncs.join custom:leave_game\nscoreboard objectives add onfuncs.death deathCount\nscoreboard objectives add onfuncs.respawn custom:time_since_death",
-        "tick": f"execute as @a run function {namespace}:onfuncs",
-        "uninstall": "",
-        
-        # On action functions        
-        "onfuncs": f"execute if score @s onfuncs.join matches 1.. run function {namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {namespace}:ondeath\nexecute if score @s onfuncs.respawn matches 1.. run function {namespace}:onrespawn\nexecute unless entity @s[tag=onfuncs.player] run function {namespace}:onnewjoin",
-
-        "onjoin": "scoreboard players set @s onfuncs.join 0",
-        "ondeath": "scoreboard players set @s onfuncs.death 0",
-        "onrespawn": "scoreboard players set @s onfuncs.respawn 0",
-        "onnewjoin": "tag @s add onfuncs.player"
-    }
-
-    conditions = 0
-
-    precision = 2
-
-    variables = {}
-    triggers = []
-
-    pNumbers = []
-
-    tempi = 0
-
-    code: str
-
+    
     def __init__(self, code: str):
         self.code = code
+
+        self.labels = {}
+
+        self.namespace = 'kcf'
+
+        # PRESET CODE
+        self.files = {
+            # Typical functions
+            "load": "scoreboard objectives add onfuncs.join custom:leave_game\nscoreboard objectives add onfuncs.death deathCount\nscoreboard objectives add onfuncs.respawn custom:time_since_death",
+            "tick": f"execute as @a run function {self.namespace}:onfuncs",
+            "uninstall": "",
+            
+            # On action functions        
+            "onfuncs": f"execute if score @s onfuncs.join matches 1.. run function {self.namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {self.namespace}:ondeath\nexecute if score @s onfuncs.respawn matches 1.. run function {self.namespace}:onrespawn\nexecute unless entity @s[tag=onfuncs.player] run function {self.namespace}:onnewjoin",
+
+            "onjoin": "scoreboard players set @s onfuncs.join 0",
+            "ondeath": "scoreboard players set @s onfuncs.death 0",
+            "onrespawn": "scoreboard players set @s onfuncs.respawn 0",
+            "onnewjoin": "tag @s add onfuncs.player"
+        }
+
+        self.conditions = 0
+        self.precision = 2
+        self.variables = {}
+        self.triggers = []
+        self.pNumbers = []
+        self.tempi = 0
 
     def get_player(self, player: str):
         match player:
@@ -131,7 +126,6 @@ class KCF:
         
         msg.append(message)
         
-
         if msg[-1] == "":
             msg.pop()
 
