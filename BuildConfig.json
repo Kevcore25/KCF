@@ -1,0 +1,9 @@
+{
+    "Build Source File": "Code.py",
+    "Build Destination": ".",
+
+    "Datapack Name": "My Datapack",
+    "Datapack Description": "Made using KCF-Py Version 1.0",
+
+    "MCFunction Namespace": "kcf"
+}
