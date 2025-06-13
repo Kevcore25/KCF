@@ -1,6 +1,6 @@
 {
     "Build Source File": "Code.py",
-    "Build Destination": ".",
+    "Build Destination": "F:\\PrismLauncher\\instances\\V 1.21.5\\minecraft\\saves\\Test\\datapacks",
 
     "Datapack Name": "My Datapack",
     "Datapack Description": "Made using KCF-Py Version 1.0",

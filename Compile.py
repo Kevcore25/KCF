@@ -9,6 +9,7 @@ CONFIG_FILE = r"BuildConfig.json"
 PACK_VERSION = 71 # 71 is 1.21.5
 
 import json, ast, KCF2
+import shutil, os
 
 # Get config
 print("Obtaining Configuration...")
@@ -41,7 +42,6 @@ t.build()
 
 print("Creating datapack structure...")
 # Create datpack
-import os
 
 join = os.path.join
 
@@ -52,6 +52,16 @@ def mkfile(file: str, value: str = ""):
 def mkdir(path: str):
     if not os.path.isdir(path):
         os.mkdir(path)
+
+# Delete
+print("Deleting old files...")
+
+if os.path.isdir(destination):
+    shutil.rmtree(destination, ignore_errors=True)
+
+
+mkdir(destination)
+os.chdir(destination)
 
 mkdir(name)
 mkdir(join(name, "data"))
@@ -80,14 +90,16 @@ mkfile(join(name, "data", "minecraft", "tags", "function", "tick.json"), json.du
     ]
 }))
 
+
 # Write
 print("Writing code...")
 
-mkdir(destination)
 
-dest = join(destination, name, "data", namespace, "function")
+dest = join(name, "data", namespace, "function")
 
 t.write_files(dest)
 
-print("Done!")
-input("Press enter to continue...\t")
+# print("Done!")
+# input("Press enter to continue...\t")
+
+t.print()

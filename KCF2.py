@@ -1,5 +1,6 @@
 import ast, json, os
 
+
 def convert_binop(binop_node, temp_name, tempi = 0):
     """
     Converts a compound BinOp node into a list of AugAssign statements
@@ -61,7 +62,9 @@ class KCF:
             "onjoin": "scoreboard players set @s onfuncs.join 0",
             "ondeath": "scoreboard players set @s onfuncs.death 0",
             "onrespawn": "scoreboard players set @s onfuncs.respawn 0",
-            "onnewjoin": "tag @s add onfuncs.player"
+            "onnewjoin": "tag @s add onfuncs.player",
+
+            "triggers": ""
         }
 
         self.conditions = 0
@@ -71,6 +74,77 @@ class KCF:
         self.pNumbers = []
         self.tempi = 0
 
+
+    def get_value(self, val: ast.Name) -> str:
+        if isinstance(val, ast.Name):
+            if val.id.startswith("_"):
+                return self.labels[val.id[1:]]
+            return val.id
+        elif isinstance(val, ast.Constant):
+            return val.value
+    
+    def get_dict(self, dictionary: ast.Dict) -> dict:
+        new = {}
+
+        for i in range(len(dictionary.keys)):
+            key = dictionary.keys[i]            
+            val = dictionary.values[i]
+
+            if isinstance(val, ast.Dict):
+                val = self.get_dict(val)
+            else:
+                val = self.get_value(val)
+
+            new[key.id] = val
+
+        print(new)
+        return new
+        
+
+    def command(self, cmd: str, args: list[ast.Constant, ast.Attribute, ast.Name]) -> str:
+        match cmd:
+            case "setblock":
+                if len(args) == 2:
+                    return f"setblock {self.get_value(args[0])} {self.get_value(args[1])}"
+                elif len(args) == 3:
+                    return f"setblock {self.get_value(args[0])} {self.get_value(args[1])} {args[2].id}"
+                
+            case "fill":
+                if len(args) == 3:
+                    return f"fill {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])}"
+                elif len(args) == 4:
+                    return f"fill {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])} {args[3].id}"
+
+            case "execute":
+                return (f"execute {' '.join(i.value for i in args[:-1])} run function {self.namespace}:{args[-1].id}")
+            
+            case "effect":
+                if len(args) == 2:
+                    return f"effect give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}"
+                elif len(args) == 3:
+                    return f"effect give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} {args[2].value}"
+                elif len(args) == 4:
+                    return f"effect give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} {args[2].value} {args[3].value}"
+                
+            case "cleareffect":
+                return f"effect clear {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}"
+
+            case "give":
+                if len(args) == 2:
+                    return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} 1"
+                elif len(args) == 3:
+                    return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} {args[2].value}"
+                elif len(args) == 4:
+                    components = self.get_dict(args[3])
+                    new = []
+                    # Due to how MC components work, the first one instead of being : must be =
+                    for k, v in components.items():
+                        new.append(f"{k}={json.dumps(v)}")
+
+                    return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}[{','.join(new)}] {args[2].value}"
+
+        raise TypeError(f"Function '{cmd}' failed to be parsed.")
+
     def get_player(self, player: str):
         match player:
             case "all": return "@a"
@@ -78,8 +152,8 @@ class KCF:
             case "nearest": return "@p"
             case "random": return "@r"
             case _:
-                if player.startswith("#"):
-                    return self. labels[player[1:]]
+                if player.startswith("_"):
+                    return self.labels[player[1:]]
                 return player
             
     def get_entity(self, entity: str):
@@ -167,7 +241,7 @@ class KCF:
                     case "entity":
                         temp += f"{y} entity {self.get_entity(value.args[0].value)} "
                     case "block":
-                        temp += f"{y} block {self.get_entity(' '.join(i.value for i in value.args))} "
+                        temp += f"{y} block {self.get_value(value.args[0])} {self.get_value(value.args[1])} "
                     case "custom":
                         temp += value.args[0].value + " "
             elif isinstance(value, ast.BoolOp):
@@ -189,6 +263,7 @@ class KCF:
             return "#global", expression.id
 
     def write(self, filename: str, data: str):
+        filename = filename.replace("__", "/")
         if filename not in self.files:
             self.files[filename] = data
         else:
@@ -222,7 +297,7 @@ class KCF:
         elif isinstance(expression.value, ast.BinOp):
             # cmds.extend(self.create_simp_var(expression.value))
             # Convert to AugAssign statements
-            statements, result_expr = convert_binop(expression.value, "temp", self.tempi)
+            statements, result_expr = convert_binop(expression.value, ".temp", self.tempi)
             self.tempi += 1
 
             # Create final assignment
@@ -265,6 +340,8 @@ class KCF:
 
     def assign(self, expression: ast.Assign):
         # Constant
+        temp = []
+
         if isinstance(expression.value, ast.Constant):
             # Must be var, so
             for var in expression.targets:
@@ -275,12 +352,13 @@ class KCF:
 
                 else:
                     entity, varName = self.parse_var(var)
+                    self.variables[varName] = "dummy"
 
-                    return (f"scoreboard players set {entity} {varName} {expression.value.value}")
+                    temp.append(f"scoreboard players set {entity} {varName} {expression.value.value}")
         elif isinstance(expression.value, ast.BinOp):
             # cmds.extend(self.create_simp_var(expression.value))
             # Convert to AugAssign statements
-            statements, result_expr = convert_binop(expression.value, "temp", self.tempi)
+            statements, result_expr = convert_binop(expression.value, ".temp", self.tempi)
             self.tempi += 1
 
             # Create final assignment
@@ -292,23 +370,24 @@ class KCF:
             # Combine all statements
             all_statements = statements + [final_assignment]
 
-            temp = []
-
             for ass in all_statements:
                 if isinstance(ass, ast.AugAssign):
                     temp.append(self.aug_assign(ass))
                 else:
                     temp.append(self.assign(ass))
             
-            return "\n".join(temp)
             
         else:
             entity2, varName2 = self.parse_var(expression.value)
             
             for var in expression.targets:
                 entity1, varName1 = self.parse_var(var)
+                # Add to vars
+                self.variables[varName1] = "dummy"
 
-                return (f"scoreboard players operation {entity1} {varName1} = {entity2} {varName2}")
+                temp.append(f"scoreboard players operation {entity1} {varName1} = {entity2} {varName2}")
+
+        return "\n".join(temp)
 
     def create_simp_var(self, value: ast.BinOp, times = 0):
         temp = []
@@ -364,6 +443,7 @@ class KCF:
         cmds = []
 
         for expression in parsed:
+            print(ast.dump(expression))
 
             if isinstance(expression, ast.FunctionDef):
                 self.write(expression.name, self.parse(expression.body, expression.name))
@@ -385,14 +465,14 @@ class KCF:
                     # IF THERE ARE NO ARGUMENTS, run USER defined function, otherwise run built-in
 
                     if len(expression.value.args) == 0:
-                        cmds.append(f"function {self.namespace}:{expression.value.func.id}")
+                        funcname = expression.value.func.id
+                        funcname = funcname.replace("__", '/')
+                        cmds.append(f"function {self.namespace}:{funcname}")
                     else:
                         args = expression.value.args
                         func = expression.value.func.id
 
                         match func:
-                            case "execute":
-                                cmds.append(f"execute {' '.join(i.value for i in args[:-1])} run function {self.namespace}:{args[-1].id}")
                             case "run":
                                 cmds.append(args[0].value)
                             case "var":
@@ -409,6 +489,9 @@ class KCF:
                                 self.triggers.append(args[0].value)
                             case "label":
                                 self.labels[args[0].value] = args[1].value
+                            case _:
+                                cmd = self.command(func, args)
+                                cmds.append(cmd)
                         
             elif isinstance(expression, ast.If):
                 temp = self.parse_condition(expression.test)               
@@ -429,11 +512,11 @@ class KCF:
                     # In new file, return if true. If it doesn't run, then the else statement is ran (other function runs)
                     # Minimize file usage by APPENDING using write function. 
                     # Because, if IF statement runs, the function returns, so code can be directly appended below the if statement
-                    temp = temp.replace("%end%", f"run return run function {self.namespace}:{fname}T")
+                    temp = temp.replace("%end%", f"run return run function {self.namespace}:{fname}t")
 
 
                     self.write(fname, temp + "\n" + self.parse(expression.orelse, fname))
-                    self.write(fname + "T", self.parse(expression.body, fname + "T"))
+                    self.write(fname + "t", self.parse(expression.body, fname + "t"))
                 
                 # Add one if to counter
                 self.conditions += 1
@@ -460,14 +543,64 @@ class KCF:
                 
                 # Add 1 to the condition counter
                 self.conditions += 1
+            elif isinstance(expression, ast.For):
+                fname = f"{filename}_for{self.conditions}"
 
+                # Get the variable name
+                var = expression.target.id
+
+                # Add to global vars
+                self.variables[var] = "dummy"
+
+                # Get the range
+                if isinstance(expression.iter, ast.Call) and expression.iter.func.id == "range":
+                    args = expression.iter.args
+
+                    step = 1
+                    start = 0
+                    if len(args) == 1:
+                        end = args[0].value
+                    elif len(args) == 2:
+                        start = args[0].value
+                        end = args[1].value
+                    elif len(args) == 3:
+                        start = args[0].value
+                        end = args[1].value
+                        step = args[2].value
+
+                    cmds.append(f"scoreboard players set #global {var} {start}\nfunction {self.namespace}:{fname}")
+
+                    self.write(fname, self.parse(expression.body, fname) +f"\nscoreboard players add #global {var} {step}\nexecute if score #global {var} matches ..{end - 1} run function {self.namespace}:{fname}")
+                    
+                    self.conditions += 1
         return "\n".join(cmds)
   
     def add_extras(self):
-        # ADD P NUMS to LOAD
-        pNumCmds = "\n".join(f"scoreboard players set {n} p-numbers {n}" for n in self.pNumbers)
+        # ADD VARIABLES
+        temp = [f"scoreboard objectives add {var} {type}" for var, type in self.variables.items()]
+        for v in temp:
+            if v not in self.files['load'].splitlines():
+                self.files['load'] = v + "\n" + self.files['load']
 
-        self.files['load'] = "scoreboard objectives add temp dummy\nscoreboard objectives add p-numbers dummy\n" + pNumCmds + "\n" + self.files['load']
+        # ADD TRIGGERS
+        if len(self.triggers) > 0:
+            self.files['onfuncs'] += f"\nfunction {self.namespace}:triggers"
+
+            for trigger in self.triggers:
+                # Add a register
+                self.files['triggers'] += f"\nscoreboard players enable @s {trigger}\nexecute if score @s {trigger} matches 1.. at @s run function {self.namespace}:triggers/{trigger}"
+
+                # Create trigger
+                if "triggers/" + trigger not in self.files:
+                    self.files['triggers/' + trigger] = f"scoreboard players reset @s {trigger}"
+                else:
+                    self.files['triggers/' + trigger] = self.files['triggers/' + trigger] + f"\nscoreboard players reset @s {trigger}"
+
+
+        # ADD P NUMS to LOAD
+        pNumCmds = "\n".join(f"scoreboard players set {n} .temp {n}" for n in self.pNumbers)
+
+        self.files['load'] = "scoreboard objectives add .temp dummy\nscoreboard objectives add p-numbers dummy\n" + pNumCmds + "\n" + self.files['load']
 
     def build(self):
         self.parse(self.code)
@@ -475,5 +608,8 @@ class KCF:
 
     def write_files(self, destination: str = "."):
         for file, contents in self.files.items():
-            with open(os.path.join(destination, file + ".mcfunction"), 'w') as f:
+            files = file.split('/')
+            if not os.path.isdir(os.path.join(destination, *files[:-1])):
+                os.mkdir(os.path.join(destination, *files[:-1]))
+            with open(os.path.join(destination, *files[:-1], files[-1] + ".mcfunction"), 'w') as f:
                 f.write(contents)

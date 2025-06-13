@@ -1,12 +1,8 @@
 from KCFSyntax import *
 
-
+_spawn: Label = "0 0 0"
 def main():
-    self.y = self.y / 10
-    # 9
-
-def tick():
-    run('say hi')
+    give(all, diamond_axe, 1, {enchantments: {unbreaking: 3, sharpness: 5}})
 
 # RUN
-import KCF2
+import Compile
