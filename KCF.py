@@ -1,7 +1,5 @@
 import json
 
-from equationparser import convert_equation
-
 namespace = "kcf"
 
 def is_simple(expr):

@@ -7,10 +7,7 @@ If you are programming with KCF, this is almost a must-have.
 It specifies valid functions to use and its arguments.
 """
 
-from items import *
-from blocks import *
-from entities import *
-from effects import *
+from ids import *
 
 entity = lambda Entity: "Entity condition for conditional statements"
 block = lambda Position, Block: "Block condition for conditional statements"

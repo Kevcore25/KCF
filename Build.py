@@ -1,6 +1,8 @@
 """
 
-"Compiles" the code based on the build configuration file
+"Compiles" the code based on the build configuration file.
+It is not really compiling, but rather "translating" the file instead.
+In KCF, I will call it "building" but know that it is more of a "translating" process.
 
 """
 
@@ -8,8 +10,17 @@ CONFIG_FILE = r"BuildConfig.json"
 
 PACK_VERSION = 71 # 71 is 1.21.5
 
-import json, ast, KCF2
+import json, ast, KCFPy
 import shutil, os
+
+
+
+# Welcome message
+print('\n' + '=' * os.get_terminal_size()[0] + "\n")
+print(f"KC Function Builder Version {KCFPy.VERSION}")
+print("Create Minecraft Datapacks with Python!")
+print(f"\n{KCFPy.VERSION} Highlights: {KCFPy.VERSION_HIGHLIGHTS}")
+print('=' * os.get_terminal_size()[0] + "\n")
 
 # Get config
 print("Obtaining Configuration...")
@@ -28,7 +39,7 @@ with open(source, 'r') as f:
     codeTree = ast.parse(f.read())
 
 print("Initializing KCF...")
-t = KCF2.KCF(codeTree.body)
+t = KCFPy.KCF(codeTree.body)
 
 # Modify namespace
 t.namespace = namespace

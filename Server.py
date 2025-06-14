@@ -10,7 +10,7 @@ import sys
 import tempfile
 import zipfile
 import os, ast
-import KCF2
+import KCFPy
 import shutil
 
 app = Flask(__name__)
@@ -47,7 +47,7 @@ def compile():
                     codeTree = ast.parse(code)
 
                     print("Initializing KCF...")
-                    t = KCF2.KCF(codeTree.body)
+                    t = KCFPy.KCF(codeTree.body)
 
                     # Modify namespace
                     t.namespace = "kcf"

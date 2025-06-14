@@ -1,5 +1,26 @@
 import ast, json, os
 
+# Version stuff
+VERSION = 2.0
+VERSION_HIGHLIGHTS = """
++ More MC functions (e.g. setblock, give, effect)
++ Automatic variable declaration
++ Automatic custom commands implementation with triggers
++ Minor bug fixes
+"""
+
+def convert_condition_astobj(op: ast.operator):
+    """
+    Converts an ast object of an operator type (e.g. <) into its string value
+    """
+    if isinstance(op, ast.Lt): return '<'
+    elif isinstance(op, ast.LtE): return '<='
+    elif isinstance(op, ast.Gt): return '>'
+    elif isinstance(op, ast.GtE): return '>='
+    elif isinstance(op, ast.NotEq): return '!='
+    elif isinstance(op, ast.Eq): return '='
+
+
 
 def convert_binop(binop_node, temp_name, tempi = 0):
     """
@@ -218,9 +239,10 @@ class KCF:
                 y = 'unless'
                 n = 'if'
 
-            if isinstance(value, ast.Compare):
+            if isinstance(value, ast.Compare):                    
+                entity, varName = self.parse_var(value.left)
+
                 if isinstance(value.comparators[0], ast.Constant):
-                    entity, varName = self.parse_var(value.left)
                     if isinstance(value.ops[0], ast.Eq):
                         temp += (f"{y} score {entity} {varName} matches {value.comparators[0].value} ")
                     elif isinstance(value.ops[0], ast.NotEq):
@@ -235,7 +257,8 @@ class KCF:
                         temp += (f"{y} score {entity} {varName} matches ..{value.comparators[0].value} ")
                 else:
                     entity2, varName2 = self.parse_var(value.comparators[0])
-                    temp += (f"{y} score {entity} {varName} = {entity2} {varName2} ")
+                    temp += f"{y} score {entity} {varName} {convert_condition_astobj(value.ops[0])} {entity2} {varName2} "
+
             elif isinstance(value, ast.Call):
                 match value.func.id:
                     case "entity":
@@ -244,6 +267,7 @@ class KCF:
                         temp += f"{y} block {self.get_value(value.args[0])} {self.get_value(value.args[1])} "
                     case "custom":
                         temp += value.args[0].value + " "
+
             elif isinstance(value, ast.BoolOp):
                 if isinstance(value.op, ast.And):
                     for v in value.values:
@@ -252,13 +276,20 @@ class KCF:
                     for v in value.values:
                         temp += "\n" + self.parse_condition(v)
 
+            elif isinstance(value, ast.Constant):
+                if isinstance(value.value, str):
+                    temp += f"{y} {value.value} "
+                elif value.value == False:
+                    # Put a random FALSE statement
+                    temp += "unless score 1 p-numbers = 1 p-numbers"
+            
         cmpre(condition)
 
         return temp + "%end%"
 
     def parse_var(self, expression: ast.Attribute | ast.Name) -> tuple[str, str]:
         if isinstance(expression, ast.Attribute):
-            return self.get_entity(expression.value.id), expression.attr
+            return self.get_entity(self.get_value(expression.value)), expression.attr
         elif isinstance(expression, ast.Name):
             return "#global", expression.id
 
@@ -582,6 +613,12 @@ class KCF:
             if v not in self.files['load'].splitlines():
                 self.files['load'] = v + "\n" + self.files['load']
 
+        # ADD ALL VARIABLES INTO UNINSTALL FUNCTION
+        temp = [f"scoreboard objectives remove {var} {type}" for var, type in self.variables.items()]
+        for v in temp:
+            if v not in self.files['uninstall'].splitlines():
+                self.files['uninstall'] = v + "\n" + self.files['uninstall']
+
         # ADD TRIGGERS
         if len(self.triggers) > 0:
             self.files['onfuncs'] += f"\nfunction {self.namespace}:triggers"
@@ -601,6 +638,7 @@ class KCF:
         pNumCmds = "\n".join(f"scoreboard players set {n} .temp {n}" for n in self.pNumbers)
 
         self.files['load'] = "scoreboard objectives add .temp dummy\nscoreboard objectives add p-numbers dummy\n" + pNumCmds + "\n" + self.files['load']
+        
 
     def build(self):
         self.parse(self.code)
