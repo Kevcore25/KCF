@@ -64,15 +64,14 @@ def mkdir(path: str):
     if not os.path.isdir(path):
         os.mkdir(path)
 
+mkdir(destination)
+os.chdir(destination)
+
 # Delete
 print("Deleting old files...")
 
-if os.path.isdir(destination):
-    shutil.rmtree(destination, ignore_errors=True)
-
-
-mkdir(destination)
-os.chdir(destination)
+if os.path.isdir(name):
+    shutil.rmtree(name, ignore_errors=True)
 
 mkdir(name)
 mkdir(join(name, "data"))

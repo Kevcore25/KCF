@@ -21,7 +21,6 @@ def convert_condition_astobj(op: ast.operator):
     elif isinstance(op, ast.Eq): return '='
 
 
-
 def convert_binop(binop_node, temp_name, tempi = 0):
     """
     Converts a compound BinOp node into a list of AugAssign statements
@@ -78,11 +77,11 @@ class KCF:
             "uninstall": "",
             
             # On action functions        
-            "onfuncs": f"execute if score @s onfuncs.join matches 1.. run function {self.namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {self.namespace}:ondeath\nexecute if score @s onfuncs.respawn matches 1.. run function {self.namespace}:onrespawn\nexecute unless entity @s[tag=onfuncs.player] run function {self.namespace}:onnewjoin",
+            "onfuncs": f"execute if score @s[tag=onfuncs.player] onfuncs.respawn matches 1 run function {self.namespace}:onrespawn\nexecute if score @s onfuncs.join matches 1.. run function {self.namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {self.namespace}:ondeath\n\nexecute unless entity @s[tag=onfuncs.player] run function {self.namespace}:onnewjoin",
 
             "onjoin": "scoreboard players set @s onfuncs.join 0",
             "ondeath": "scoreboard players set @s onfuncs.death 0",
-            "onrespawn": "scoreboard players set @s onfuncs.respawn 0",
+            "onrespawn": "", # Devs: You can also make your own "while dead" by doing: if self.onfuncs.death == 0:
             "onnewjoin": "tag @s add onfuncs.player",
 
             "triggers": ""
@@ -96,14 +95,16 @@ class KCF:
         self.tempi = 0
 
 
-    def get_value(self, val: ast.Name) -> str:
+    def get_value(self, val) -> str:
         if isinstance(val, ast.Name):
             if val.id.startswith("_"):
                 return self.labels[val.id[1:]]
             return val.id
         elif isinstance(val, ast.Constant):
             return val.value
-    
+        elif isinstance(val, ast.Attribute):
+            return self.get_value(val.value) + "." + val.attr
+        
     def get_dict(self, dictionary: ast.Dict) -> dict:
         new = {}
 
@@ -226,18 +227,22 @@ class KCF:
 
         return json.dumps(msg)
 
+    def bool_to_if(self, value: bool):
+        if value:
+            y = "if"
+            n = "unless"
+        else:
+            y = 'unless'
+            n = 'if'
 
+        return y, n
+    
     def parse_condition(self, condition):
         temp = "execute "
         def cmpre(value, opp=False):
             nonlocal temp
 
-            if not opp:
-                y = "if"
-                n = "unless"
-            else:
-                y = 'unless'
-                n = 'if'
+            y, n = self.bool_to_if(not opp)
 
             if isinstance(value, ast.Compare):                    
                 entity, varName = self.parse_var(value.left)
@@ -257,7 +262,11 @@ class KCF:
                         temp += (f"{y} score {entity} {varName} matches ..{value.comparators[0].value} ")
                 else:
                     entity2, varName2 = self.parse_var(value.comparators[0])
-                    temp += f"{y} score {entity} {varName} {convert_condition_astobj(value.ops[0])} {entity2} {varName2} "
+                    # Detect 
+                    if isinstance(value.ops[0], ast.NotEq):
+                        temp += f"{n} score {entity} {varName} = {entity2} {varName2} "
+                    else:
+                        temp += f"{y} score {entity} {varName} {convert_condition_astobj(value.ops[0])} {entity2} {varName2} "
 
             elif isinstance(value, ast.Call):
                 match value.func.id:
@@ -289,6 +298,10 @@ class KCF:
 
     def parse_var(self, expression: ast.Attribute | ast.Name) -> tuple[str, str]:
         if isinstance(expression, ast.Attribute):
+            if isinstance(expression.value, ast.Attribute):
+                a, b = self.parse_var(expression.value)
+                return a, b + "." + expression.attr
+
             return self.get_entity(self.get_value(expression.value)), expression.attr
         elif isinstance(expression, ast.Name):
             return "#global", expression.id
@@ -614,7 +627,7 @@ class KCF:
                 self.files['load'] = v + "\n" + self.files['load']
 
         # ADD ALL VARIABLES INTO UNINSTALL FUNCTION
-        temp = [f"scoreboard objectives remove {var} {type}" for var, type in self.variables.items()]
+        temp = [f"scoreboard objectives remove {var}" for var, type in self.variables.items()]
         for v in temp:
             if v not in self.files['uninstall'].splitlines():
                 self.files['uninstall'] = v + "\n" + self.files['uninstall']
