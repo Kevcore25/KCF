@@ -172,4 +172,6 @@ def summon(Entity: Entity | str | Label, Position: str = "~ ~ ~", Properties: di
     Example: `summon(zombie)`
 
     Example 2: `summon(zombie, "~ ~ ~", {glowing: true})`
+
+    As of V.2.0, the properties parameter does NOT work. Please use a str based property, like: `summon(zombie, "~ ~ ~", "{glowing: true}")`
     """

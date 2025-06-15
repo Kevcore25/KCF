@@ -115,61 +115,26 @@
         
         <div class="form-group">
             <label>Python Code Editor:</label>
-            <div id="editor"># Enter KCF code here.
-
-"""
-Example: Stamina system! (NOT TESTED)
-"""
+            <a href="https://github.com/Kevcore25/KCF/blob/main/KCFSyntax.py" target="_blank">KCF Function Reference</a>
+            <div id="editor">""" MAIN FUNCTIONS """
+def tick():
+    "Code that runs every tick"
 
 def load():
-    var("stamina")
-    var("staminaCD")
+    "Code that runs every reload"
 
-    var("jump", "custom:jump")
-    var("sprinting", "custom:sprint_one_cm")
-
-def sprinting():
-    self.stamina -= 10
-    self.staminaCD = 20
-    self.sprinting = 0
-
-def jumping():
-    self.stamina -= 500
-    self.staminaCD = 20
-    self.jump = 0
-
-def displayStamina():
-    self.temp = self.stamina / 100
-
-def regenStamina():
-    self.stamina += 100
-    if self.stamina > 10000:
-        self.stamina = 10000
-
+""" Built-in Action Functions """
 def onjoin():
-    self.stamina = 10000
+    "Code that runs as a player every time they join"
 
-def nostamina():
-    run('effect give @s slowness 1 3 true')
+def ondeath():
+    "Code that runs as a player every time they die"
 
-def tick():
-    def executeAll():
-        if self.staminaCD == 0:
-            regenStamina()
-        if self.staminaCD > 0 and self.stamina < 10000:
-            self.stamina -= 1
-        if self.sprint > 0:
-            sprinting()
-        if self.jump > 0:
-            jumping()
-        if self.stamina < 0:
-            self.stamina = 0
-        if self.stamina == 0:
-            nostamina()
-        if self.stamina < 10000:
-            displayStamina()
+def onrespawn():
+    "Code that runs as a player every time they respawn"
 
-    execute("as @a", executeAll)</div>
+def onnewjoin():
+    "Code that runs as a player once they join for the first time"</div>
         </div>
         
         <div class="controls">
@@ -200,7 +165,8 @@ def tick():
             enableBasicAutocompletion: true,
             enableLiveAutocompletion: true,
             fontSize: "14px",
-            showPrintMargin: false
+            showPrintMargin: false,
+            enableSnippets: true
         });
 
         // Theme selector

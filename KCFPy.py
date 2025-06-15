@@ -9,6 +9,9 @@ VERSION_HIGHLIGHTS = """
 + Minor bug fixes
 """
 
+# Turn debug mode on or off
+debug = False
+
 def convert_condition_astobj(op: ast.operator):
     """
     Converts an ast object of an operator type (e.g. <) into its string value
@@ -77,7 +80,7 @@ class KCF:
             "uninstall": "",
             
             # On action functions        
-            "onfuncs": f"execute if score @s[tag=onfuncs.player] onfuncs.respawn matches 1 run function {self.namespace}:onrespawn\nexecute if score @s onfuncs.join matches 1.. run function {self.namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {self.namespace}:ondeath\n\nexecute unless entity @s[tag=onfuncs.player] run function {self.namespace}:onnewjoin",
+            "onfuncs": f"execute if score @s[tag=onfuncs.player] onfuncs.respawn matches 1 run function {self.namespace}:onrespawn\nexecute if score @s onfuncs.join matches 1.. run function {self.namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {self.namespace}:ondeath\nexecute unless entity @s[tag=onfuncs.player] run function {self.namespace}:onnewjoin",
 
             "onjoin": "scoreboard players set @s onfuncs.join 0",
             "ondeath": "scoreboard players set @s onfuncs.death 0",
@@ -119,7 +122,7 @@ class KCF:
 
             new[key.id] = val
 
-        print(new)
+        if debug: print(new)
         return new
         
 
@@ -164,6 +167,13 @@ class KCF:
                         new.append(f"{k}={json.dumps(v)}")
 
                     return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}[{','.join(new)}] {args[2].value}"
+            case "summon":
+                if len(args) == 1:
+                    return f"summon {self.get_value(args[0])}"
+                elif len(args) == 2:
+                    return f"summon {self.get_value(args[0])} {self.get_value(args[1])}"
+                elif len(args) == 3:
+                    return f"summon {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])}"
 
         raise TypeError(f"Function '{cmd}' failed to be parsed.")
 
@@ -487,7 +497,7 @@ class KCF:
         cmds = []
 
         for expression in parsed:
-            print(ast.dump(expression))
+            if debug: print(ast.dump(expression))
 
             if isinstance(expression, ast.FunctionDef):
                 self.write(expression.name, self.parse(expression.body, expression.name))

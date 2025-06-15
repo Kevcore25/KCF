@@ -2,13 +2,11 @@
 Simple flask application
 """
 PACK_VERSION = 71
-import traceback
 from flask import Flask, request, jsonify, send_file, make_response
-import io
-import subprocess, json
+import json
 import sys
 import tempfile
-import zipfile
+import time
 import os, ast
 import KCFPy
 import shutil
@@ -38,26 +36,42 @@ def compile():
 
         try:
             original_stdout = sys.stdout
+            lastTime = 0
+            def runtime():
+                nonlocal lastTime
+
+                print(f"Done! (took {round((time.time() - lastTime) * 1000)} milliseconds)")
+
+                lastTime = time.time()
+
             with open(std_output_path, 'w') as f:
                 sys.stdout = f
                 try:
+                    size = 50
+                    print("Initializing KCF-Py...")                    
 
-                    # Get Code
-                    print("Getting code...")
+                    print('\n' + '=' * size + "\n")
+                    print(f"KC Function Builder Version {KCFPy.VERSION}")
+                    print("Create Minecraft Datapacks with Python!")
+                    print(f"\n{KCFPy.VERSION} Highlights: {KCFPy.VERSION_HIGHLIGHTS}")
+                    print('=' * size + "\n")
+
+                    lastTime = time.time()
                     codeTree = ast.parse(code)
 
-                    print("Initializing KCF...")
                     t = KCFPy.KCF(codeTree.body)
 
                     # Modify namespace
                     t.namespace = "kcf"
+                    namespace = 'kcf'
 
-                    print("Building code...")
+                    runtime()
+
                     # Build to memory
+                    print("Building code...")
                     t.build()
 
-                    # Print to console - optional
-                    # t.print()
+                    runtime()
 
                     print("Creating datapack structure...")
                     # Create datpack
@@ -71,7 +85,6 @@ def compile():
                         if not os.path.isdir(path):
                             os.mkdir(path)
 
-                    namespace = 'kcf'
 
                     mkdir(name)
                     mkdir(join(name, "data"))
@@ -100,6 +113,8 @@ def compile():
                         ]
                     }))
 
+                    runtime()
+
                     # Write
                     print("Writing code...")
 
@@ -110,15 +125,17 @@ def compile():
                     dest = join(destination, name, "data", namespace, "function")
 
                     t.write_files(dest)
+                    runtime()
 
                     print("Zipping file")
                     # with zipfile.ZipFile(output_path, 'w') as zipf:
                     #     for file_path in os.listdir(os.path.join(destination, name)):
                     #         zipf.write(file_path)
                     shutil.make_archive('tempfile', 'zip', os.path.join(destination, name))
+                    runtime()
 
-                    print("Done! Printed contents:")
-
+                    print("Build done! Printed contents:")
+                    
                     t.print()
                 finally:
                     sys.stdout = original_stdout
@@ -152,4 +169,4 @@ def compile():
         return str(e), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run("0.0.0.0", debug=False, port=5000) # Debug might be unsafe, idk
