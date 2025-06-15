@@ -1,12 +1,14 @@
 import ast, json, os
 
 # Version stuff
-VERSION = 2.1
+VERSION = 2.2
 VERSION_HIGHLIGHTS = """
 2.0 Changes:
 + More MC functions (e.g. setblock, give, effect)
 + Automatic variable declaration
 + Automatic custom commands implementation with triggers
+2.2 Changes:
++ Accepts Decimals (up to 2 digits) for multiply and divide operations which round to the nearest int.
 """
 
 # Turn debug mode on or off
@@ -23,6 +25,11 @@ def convert_condition_astobj(op: ast.operator):
     elif isinstance(op, ast.NotEq): return '!='
     elif isinstance(op, ast.Eq): return '='
 
+    elif isinstance(op, ast.Add): return '+'
+    elif isinstance(op, ast.Sub): return '-'
+    elif isinstance(op, ast.Mult): return '*'
+    elif isinstance(op, ast.Div) or isinstance(op, ast.FloorDiv): return '/'
+    elif isinstance(op, ast.Mod): return '%'
 
 def convert_binop(binop_node, temp_name, tempi = 0):
     """
@@ -53,10 +60,15 @@ def convert_binop(binop_node, temp_name, tempi = 0):
     ]
     
     for operand in operands[1:]:
-        statements.append(
-            ast.AugAssign(target=temp_store, op=binop_node.op, value=operand)
-        )
-    
+        if isinstance(operand, ast.Constant):
+            statements.append(
+                ast.AugAssign(target=temp_store, op=binop_node.op, value=operand)
+            )
+        else:
+            statements.append(
+                ast.AugAssign(target=operand, op=binop_node.op, value=temp_store)
+            )
+        
     return statements, temp_load
 
 
@@ -72,12 +84,14 @@ class KCF:
 
         self.namespace = 'kcf'
 
+        self.precision = 3
+
         # PRESET CODE
         self.files = {
             # Typical functions
             "load": "scoreboard objectives add onfuncs.join custom:leave_game\nscoreboard objectives add onfuncs.death deathCount\nscoreboard objectives add onfuncs.respawn custom:time_since_death",
             "tick": f"execute as @a run function {self.namespace}:onfuncs",
-            "uninstall": "",
+            "uninstall": "scoreboard objectives remove .temp\nscoreboard objectives remove p-numbers",
             
             # On action functions        
             "onfuncs": f"execute if score @s[tag=onfuncs.player] onfuncs.respawn matches 1 run function {self.namespace}:onrespawn\nexecute if score @s onfuncs.join matches 1.. run function {self.namespace}:onjoin\nexecute if score @s onfuncs.death matches 1.. run function {self.namespace}:ondeath\nexecute unless entity @s[tag=onfuncs.player] run function {self.namespace}:onnewjoin",
@@ -317,7 +331,7 @@ class KCF:
             return "#global", expression.id
 
     def write(self, filename: str, data: str):
-        filename = filename.replace("__", "/")
+        filename = filename.replace("__", "/").lower()
         if filename not in self.files:
             self.files[filename] = data
         else:
@@ -334,19 +348,45 @@ class KCF:
             # If self, e.g.
             entity, varName = self.parse_var(var)
 
+            value = expression.value.value
+
             if isinstance(expression.op, ast.Add):
-                return (f"scoreboard players add {entity} {varName} {expression.value.value}")
+                return (f"scoreboard players add {entity} {varName} {value}")
             elif isinstance(expression.op, ast.Sub):
-                return (f"scoreboard players remove {entity} {varName} {expression.value.value}")
+                return (f"scoreboard players remove {entity} {varName} {value}")
             else:
-                if expression.value.value not in self.pNumbers:
-                    self.pNumbers.append(expression.value.value)
-                if isinstance(expression.op, ast.Mult):
-                    return (f"scoreboard players operation {entity} {varName} *= {expression.value.value} p-numbers")
-                elif isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
-                    return (f"scoreboard players operation {entity} {varName} /= {expression.value.value} p-numbers")
+                if value not in self.pNumbers:
+                    self.pNumbers.append(value)
+
+                if isinstance(expression.op, ast.Mult) or isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
+                    # For decimals, use 2 commands to essnetially give a best rounded answer.
+                    if isinstance(value, float):
+                        value = expression.value.value
+
+                        # Num of digits after .
+                        digits = len(str(value).split('.')[1])
+
+                        if digits > self.precision:
+                            precision = self.precision
+                        else:
+                            precision = digits
+
+                        rvalue = round(value * (10 ** precision))
+                        
+                        if isinstance(expression.op, ast.Mult):
+                            a, b = '*', '/'
+                        else:
+                            a, b = '/', '*'
+                            
+                        return (
+                            f"scoreboard players operation {entity} {varName} {a}= {rvalue} p-numbers\n" + 
+                            f"scoreboard players operation {entity} {varName} {b}= {10 ** precision} p-numbers" 
+                        )
+                    else:
+                        return (f"scoreboard players operation {entity} {varName} {convert_condition_astobj(expression.op)}= {value} p-numbers")
+
                 elif isinstance(expression.op, ast.Mod):
-                    return (f"scoreboard players operation {entity} {varName} %= {expression.value.value} p-numbers")
+                    return (f"scoreboard players operation {entity} {varName} %= {value} p-numbers")
             
         elif isinstance(expression.value, ast.BinOp):
             # cmds.extend(self.create_simp_var(expression.value))
@@ -660,7 +700,7 @@ class KCF:
 
 
         # ADD P NUMS to LOAD
-        pNumCmds = "\n".join(f"scoreboard players set {n} .temp {n}" for n in self.pNumbers)
+        pNumCmds = "\n".join(f"scoreboard players set {n} p-numbers {n}" for n in self.pNumbers)
 
         self.files['load'] = "scoreboard objectives add .temp dummy\nscoreboard objectives add p-numbers dummy\n" + pNumCmds + "\n" + self.files['load']
         
