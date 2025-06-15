@@ -53,7 +53,7 @@ def compile():
                     print('\n' + '=' * size + "\n")
                     print(f"KC Function Builder Version {KCFPy.VERSION}")
                     print("Create Minecraft Datapacks with Python!")
-                    print(f"\n{KCFPy.VERSION} Highlights: {KCFPy.VERSION_HIGHLIGHTS}")
+                    print(f"\nVersion Highlights: {KCFPy.VERSION_HIGHLIGHTS}")
                     print('=' * size + "\n")
 
                     lastTime = time.time()

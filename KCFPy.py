@@ -1,12 +1,12 @@
 import ast, json, os
 
 # Version stuff
-VERSION = 2.0
+VERSION = 2.1
 VERSION_HIGHLIGHTS = """
+2.0 Changes:
 + More MC functions (e.g. setblock, give, effect)
 + Automatic variable declaration
 + Automatic custom commands implementation with triggers
-+ Minor bug fixes
 """
 
 # Turn debug mode on or off
@@ -406,11 +406,12 @@ class KCF:
 
                 else:
                     entity, varName = self.parse_var(var)
-                    self.variables[varName] = "dummy"
+
+                    if varName not in self.variables:
+                        self.variables[varName] = "dummy"
 
                     temp.append(f"scoreboard players set {entity} {varName} {expression.value.value}")
         elif isinstance(expression.value, ast.BinOp):
-            # cmds.extend(self.create_simp_var(expression.value))
             # Convert to AugAssign statements
             statements, result_expr = convert_binop(expression.value, ".temp", self.tempi)
             self.tempi += 1
@@ -631,10 +632,11 @@ class KCF:
   
     def add_extras(self):
         # ADD VARIABLES
-        temp = [f"scoreboard objectives add {var} {type}" for var, type in self.variables.items()]
-        for v in temp:
-            if v not in self.files['load'].splitlines():
-                self.files['load'] = v + "\n" + self.files['load']
+        for var, t in self.variables.items():
+            if t == 'dummy':
+                v = f"scoreboard objectives add {var} dummy"
+                if v not in self.files['load'].splitlines():
+                    self.files['load'] = v + "\n" + self.files['load']
 
         # ADD ALL VARIABLES INTO UNINSTALL FUNCTION
         temp = [f"scoreboard objectives remove {var}" for var, type in self.variables.items()]
