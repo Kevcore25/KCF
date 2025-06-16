@@ -51,8 +51,8 @@ def convert_binop(binop_node, temp_name, tempi = 0):
         return [], binop_node
 
     # Create temporary variable nodes
-    temp_store = ast.Attribute(value=ast.Name(id=f'temp{tempi}', ctx=ast.Store()), attr=temp_name, ctx=ast.Store())
-    temp_load = ast.Attribute(value=ast.Name(id=f'temp{tempi}', ctx=ast.Load()), attr=temp_name, ctx=ast.Load())
+    temp_store = ast.Attribute(value=ast.Name(id=f'.t{tempi}', ctx=ast.Store()), attr=temp_name, ctx=ast.Store())
+    temp_load = ast.Attribute(value=ast.Name(id=f'.t{tempi}', ctx=ast.Load()), attr=temp_name, ctx=ast.Load())
 
     # Generate statements
     statements = [
@@ -355,8 +355,6 @@ class KCF:
             elif isinstance(expression.op, ast.Sub):
                 return (f"scoreboard players remove {entity} {varName} {value}")
             else:
-                if value not in self.pNumbers:
-                    self.pNumbers.append(value)
 
                 if isinstance(expression.op, ast.Mult) or isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
                     # For decimals, use 2 commands to essnetially give a best rounded answer.
@@ -377,12 +375,17 @@ class KCF:
                             a, b = '*', '/'
                         else:
                             a, b = '/', '*'
-                            
+
+                        for i in (rvalue, 10**precision):
+                            if i not in self.pNumbers:
+                                self.pNumbers.append(i) 
                         return (
                             f"scoreboard players operation {entity} {varName} {a}= {rvalue} p-numbers\n" + 
                             f"scoreboard players operation {entity} {varName} {b}= {10 ** precision} p-numbers" 
                         )
                     else:
+                        if value not in self.pNumbers:
+                            self.pNumbers.append(value)
                         return (f"scoreboard players operation {entity} {varName} {convert_condition_astobj(expression.op)}= {value} p-numbers")
 
                 elif isinstance(expression.op, ast.Mod):
