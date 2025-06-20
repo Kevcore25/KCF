@@ -11,7 +11,7 @@ VERSION_HIGHLIGHTS = """
 """
 
 # Turn debug mode on or off
-debug = True
+debug = False
 
 
 colors = {
