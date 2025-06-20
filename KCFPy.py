@@ -1,18 +1,150 @@
-import ast, json, os
+import ast, json, os, re
 
 # Version stuff
-VERSION = 2.2
+VERSION = 3.0
 VERSION_HIGHLIGHTS = """
-2.0 Changes:
-+ More MC functions (e.g. setblock, give, effect)
-+ Automatic variable declaration
-+ Automatic custom commands implementation with triggers
-2.2 Changes:
-+ Accepts Decimals (up to 2 digits) for multiply and divide operations which round to the nearest int.
+3.0 Changes:
+* Forced all function names to be lowered
+* "Function" type now accepts both a function name, or a function call
+* Added FormattedString for title/tellraw commands
+* Added a bunch of commonly used commands
 """
 
 # Turn debug mode on or off
-debug = False
+debug = True
+
+
+colors = {
+    'red':'red',
+    'orange':'gold',
+    'yellow':'yellow',
+    'green':'green',
+    'aqua':'aqua',
+    'blue':'blue',
+    'dark_blue':'dark_blue',
+    'dark_aqua':'dark_aqua',
+    'purple':'dark_purple',
+    'pink':'light_purple',
+    'magenta':'light_purple',
+    'black':'black',
+    'gray':'gray',
+    'grey':'gray',
+    'light_gray':'light_gray',
+    'light_grey':'light_gray',
+    'dark_gray':'dark_gray',
+    'dark_grey':'dark_gray',
+    'white':'white'
+}
+
+def is_hex(s: str):
+    return set(s) <= set('0123456789abcdef')
+
+def ktf(formats: str) -> dict:
+    result = {}
+
+    for format in formats.split(','):
+        format = format.strip()
+
+        if format in ('r', 'reset'):
+            result = {'bold': False, "italic": False, "underlined": False, "color": "white", "strikethrough": False, "obfuscated": False}
+
+        elif format in ('b', 'bold'):
+            result['bold'] = True
+        elif format in ('i', 'italic'):
+            result['italic'] = True
+        elif format in ('u', 'underline', 'underlined'):
+            result['underlined'] = True
+
+        # Use mathematics and SET theory to condense code.
+        elif set(format) <= set("biu") and len(format) <= 3 and format != "bbb": # bbb is valid hex
+            if 'b' in format: result['bold'] = True
+            if 'i' in format: result['italic'] = True
+            if 'u' in format: result['underlined'] = True
+
+        ## Colours
+
+        # 3-digit hex
+        elif len(format) == 3 and is_hex(format):
+            temp = ""
+            for i in format:
+                temp += i * 2
+            result['color'] = '#' + temp
+        elif len(format) == 6 and is_hex(format):
+            result['color'] = '#' + format
+
+        elif format in list(colors):
+            result['color'] = colors[format]
+
+    return result
+
+def textformat(cmd: str): 
+
+    ft = lambda txt: re.findall(r"#([^#]*)#",txt)
+
+    def ms(text, color="", b=None, i=None, u=None):
+        s = {"text": text}
+
+        if color != "":
+            s["color"] = color
+        if b is not None:
+            s["bold"] = b
+        if i is not None:
+            s["italic"] = i
+        if u is not None:
+            s["underlined"] = u
+
+
+        return s
+
+    c = ""
+    b,i,u = None,None,None
+
+    l = []
+
+    if "#" in cmd and not cmd.startswith("#"): l.append(cmd.split("#")[0])
+
+    for _ in range(100): # Only allow a certain amount of executions
+        a = ft(cmd)
+        if len(a) > 0:
+            t = a[0]
+            for tag in t.split(","):
+                tag = tag.lower()
+                if tag in ["b","bold"]: b = True
+                elif tag in ["i","italic"]: i = True
+                elif tag in ["u","underlined"]: u = True
+
+                # Detect bi bu stuff
+                elif set(tag) <= set("biu") and len(tag) <= 3 and tag != "bbb":
+                    if 'b' in tag: b = True
+                    if 'i' in tag: i = True
+                    if 'u' in tag: u = True
+
+                # If a vaild color is specified, change the color
+                elif tag in list(colors):
+                    c = colors[tag]
+                # RGB hex
+                elif set(tag) <= set("0123456789abcdef") and (len(tag) == 6 or len(tag) == 3):
+                    if len(tag) == 6: c = "#" + tag
+                    else: 
+                        c = "#"
+                        for letter in tag:
+                            c += letter+letter
+
+                # Reset
+                elif tag in ["r","reset"]:
+                    c = "white"
+                    b,i,u = False,False,False
+
+
+            cmd = cmd.split(f"#{t}#",1)[1]      
+
+        
+        if "#" in cmd: txt = cmd.split("#")[0]
+        else: txt = cmd
+        l.append(ms(txt, c, b,i,u))
+        if "#" not in cmd: break
+
+    return l
 
 def convert_condition_astobj(op: ast.operator):
     """
@@ -138,9 +270,89 @@ class KCF:
 
         if debug: print(new)
         return new
-        
 
-    def command(self, cmd: str, args: list[ast.Constant, ast.Attribute, ast.Name]) -> str:
+    def fstring(self, text: ast.JoinedStr | ast.Constant) -> str:
+        result = []
+
+        # Firstly, determine is the text is even a JOINED STR
+        if isinstance(text, ast.JoinedStr):
+            for value in text.values:
+                if isinstance(value, ast.Constant):
+                    result += textformat(value.value)
+                elif isinstance(value, ast.FormattedValue):
+
+                    if value.format_spec is not None:
+                        t: str = value.format_spec.values[0].value.strip()
+                        c = None
+
+                        # Specified colour / formatting
+                        if "|" in t:
+                            t, c = t.split("|", 1)
+                            t = t.strip()
+                            c = c.strip()
+
+                        temp = {}
+
+                        # Match type
+                        match t:
+                            case "var" | "score" | "": # Empty = not specified = var
+                                entity, varName = self.parse_var(value.value)
+                                temp = {"score": {"objective": varName, "name": entity}}
+                            case "entity" | "player" | "selector":
+                                temp = {"selector": self.get_entity(self.get_value(value.value))}
+
+                        # Apply colour
+                        if c is not None:
+                            temp |= ktf(c) # |= is valid?
+
+                        result.append(temp)
+                    else:
+                        entity, varName = self.parse_var(value.value)
+                        result.append({"score": {"objective": varName, "name": entity}})
+
+            return result
+        
+        # Otherwise if it is a constant
+        elif isinstance(text, ast.Constant):
+            return text.value
+        
+        else:
+            return ""
+
+    def get_func(self, function: ast.Name | ast.Lambda, filename: str = ""):
+        if isinstance(function, ast.Name):
+            return f"function {self.namespace}:{function.id}" 
+        elif isinstance(function, ast.Lambda):                
+            fname = filename + f'_lmb{self.conditions}'
+            self.conditions += 1
+
+            code = self.parse([ast.Expr(value=function.body)], fname)
+            if code.count('\n') == 0:
+                return code
+            else:
+                self.write(fname, code)
+                return f"function {self.namespace}:{fname}"
+        elif isinstance(function, ast.Call):
+            fname = filename + f'_lmb{self.conditions}'
+            self.conditions += 1
+
+            code = self.parse([ast.Expr(value=function)], fname)
+            if code.count("\n") == 0:
+                return code
+            else:
+                self.write(fname, code)
+                return f"function {self.namespace}:{fname}"
+
+        raise TypeError("Not a valid function")
+    
+    def get_int(self, value: ast.Constant | ast.UnaryOp):
+        # If it is negative it is a unary op for some reason
+        if isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
+            return -value.operand.value
+        else:
+            return value.value
+
+    def command(self, cmd: str, args: list[ast.Constant, ast.Attribute, ast.Name], filename: str = "") -> str:
         match cmd:
             case "setblock":
                 if len(args) == 2:
@@ -155,7 +367,7 @@ class KCF:
                     return f"fill {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])} {args[3].id}"
 
             case "execute":
-                return (f"execute {' '.join(i.value for i in args[:-1])} run function {self.namespace}:{args[-1].id}")
+                return (f"execute {' '.join(i.value for i in args[:-1])} run {self.get_func(args[-1], filename)}")
             
             case "effect":
                 if len(args) == 2:
@@ -189,6 +401,57 @@ class KCF:
                 elif len(args) == 3:
                     return f"summon {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])}"
 
+            case "attribute":
+                if len(args) == 2:
+                    return f"attribute {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} base get"
+                elif len(args) == 3:
+                    return f"attribute {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} base set {self.get_int(args[2])}"
+            case "resetattribute":
+                return f"attribute {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} base reset"
+
+            # CREATORS: Just use the RUN function for now.
+            # case "bossbar":
+            #     match self.get_value(args[0]).lower():
+            #         case "add" | "create":
+            #             return f"bossbar add {self.}"
+
+            case "dialog":
+                if len(args) == 1:
+                    return f"dialog clear {self.get_player(args[0])}"
+                elif len(args) == 2:
+                    return f"dialog show {self.get_player(args[0])}{self.get_value(args[1])}"
+                
+            case "enchant":
+                if len(args) == 2:
+                    return f"enchant {self.get_player(args[0])} {self.get_value(args[1])}"
+                elif len(args) == 3:
+                    return f"enchant {self.get_player(args[0])} {self.get_value(args[1])} {args[2].value}"
+            
+            case "kill":
+                return f"kill {self.get_entity(self.get_value(args[0]))}"
+            
+            case "getplayers":
+                player, name = self.parse_var(args[0])
+                return f"scoreboard players reset {player} {name}\nexecute at @a run scoreboard players add {player} {name} 1"
+            
+            case "randint":
+                player, name = self.parse_var(args[0])
+
+                return f"execute store result score {player} {name} run random value {self.get_int(args[1])}..{self.get_int(args[2])}"
+
+            case "tellraw":
+                return f"tellraw {self.get_player(self.get_value(args[0]))} {json.dumps(self.fstring(args[1]))}"
+            
+            case "title":
+                return f"title {self.get_player(self.get_value(args[0]))} title {json.dumps(self.fstring(args[1]))}"
+            case "subtitle":
+                return f"title {self.get_player(self.get_value(args[0]))} subtitle {json.dumps(self.fstring(args[1]))}"
+            case "times":
+                if len(args) == 4:
+                    return f"title {self.get_player(self.get_value(args[0]))} times {args[1].value} {args[2].value} {args[3].value}"
+                elif len(args) == 2:
+                    return f"title {self.get_player(self.get_value(args[0]))} times {args[1].value}"
+               
         raise TypeError(f"Function '{cmd}' failed to be parsed.")
 
     def get_player(self, player: str):
@@ -261,29 +524,30 @@ class KCF:
 
         return y, n
     
-    def parse_condition(self, condition):
-        temp = "execute "
+    def parse_condition(self, condition, starting = 'execute '):
+        temp = starting
+        add = True
         def cmpre(value, opp=False):
-            nonlocal temp
+            nonlocal temp, add
 
             y, n = self.bool_to_if(not opp)
 
             if isinstance(value, ast.Compare):                    
                 entity, varName = self.parse_var(value.left)
 
-                if isinstance(value.comparators[0], ast.Constant):
+                if isinstance(value.comparators[0], ast.Constant) or isinstance(value.comparators[0], ast.UnaryOp):
                     if isinstance(value.ops[0], ast.Eq):
-                        temp += (f"{y} score {entity} {varName} matches {value.comparators[0].value} ")
+                        temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[0])} ")
                     elif isinstance(value.ops[0], ast.NotEq):
-                        temp += (f"{n} score {entity} {varName} matches {value.comparators[0].value} ")
+                        temp += (f"{n} score {entity} {varName} matches {self.get_int(value.comparators[0])} ")
                     elif isinstance(value.ops[0], ast.Gt):
-                        temp += (f"{y} score {entity} {varName} matches {value.comparators[0].value + 1}.. ")
+                        temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[0]) + 1}.. ")
                     elif isinstance(value.ops[0], ast.GtE):
-                        temp += (f"{y} score {entity} {varName} matches {value.comparators[0].value}.. ")
+                        temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[0])}.. ")
                     elif isinstance(value.ops[0], ast.Lt):
-                        temp += (f"{y} score {entity} {varName} matches ..{value.comparators[0].value - 1} ")
+                        temp += (f"{y} score {entity} {varName} matches ..{self.get_int(value.comparators[0]) - 1} ")
                     elif isinstance(value.ops[0], ast.LtE):
-                        temp += (f"{y} score {entity} {varName} matches ..{value.comparators[0].value} ")
+                        temp += (f"{y} score {entity} {varName} matches ..{self.get_int(value.comparators[0])} ")
                 else:
                     entity2, varName2 = self.parse_var(value.comparators[0])
                     # Detect 
@@ -306,9 +570,13 @@ class KCF:
                     for v in value.values:
                         cmpre(v)
                 elif isinstance(value.op, ast.Or):
+                    print('a', value.values)
+                    temp += 'run '
+                    t = []
                     for v in value.values:
-                        temp += "\n" + self.parse_condition(v)
-
+                        t.append(self.parse_condition(v))
+                    temp += f'\n{temp}'.join(t)
+                    add = False
             elif isinstance(value, ast.Constant):
                 if isinstance(value.value, str):
                     temp += f"{y} {value.value} "
@@ -318,8 +586,12 @@ class KCF:
             
         cmpre(condition)
 
-        return temp + "%end%"
-
+        print('RESULT', temp)
+        if add:
+            return temp + "%end%"
+        else:
+            return temp.replace("execute run ", '')
+        
     def parse_var(self, expression: ast.Attribute | ast.Name) -> tuple[str, str]:
         if isinstance(expression, ast.Attribute):
             if isinstance(expression.value, ast.Attribute):
@@ -342,13 +614,13 @@ class KCF:
             print(f"\nIN FILE {file}.mcfunction:\n" + self.files[file])
 
     def aug_assign(self, expression: ast.Attribute | ast.Name):
-        if isinstance(expression.value, ast.Constant):
+        if isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
             # Must be var, so
             var = expression.target
             # If self, e.g.
             entity, varName = self.parse_var(var)
 
-            value = expression.value.value
+            value = self.get_int(expression.value)
 
             if isinstance(expression.op, ast.Add):
                 return (f"scoreboard players add {entity} {varName} {value}")
@@ -439,13 +711,13 @@ class KCF:
         # Constant
         temp = []
 
-        if isinstance(expression.value, ast.Constant):
+        if isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
             # Must be var, so
             for var in expression.targets:
                 # If self, e.g.                    
                 # # IF LABEL, aka starts with _:
                 if isinstance(var, ast.Name) and var.id.startswith("_"):
-                    self.labels[var.id[1:]] = expression.value.value
+                    self.labels[var.id[1:]] = self.get_int(expression.value)
 
                 else:
                     entity, varName = self.parse_var(var)
@@ -498,7 +770,7 @@ class KCF:
         else:                
             expression = value
 
-            if isinstance(value.right, ast.Constant):
+            if isinstance(value.right, ast.Constant) or isinstance(value.right, ast.UnaryOp):
                 # Must be var, so
                 var = value.left
                 # If self, e.g.
@@ -506,18 +778,18 @@ class KCF:
 
 
                 if isinstance(expression.op, ast.Add):
-                    temp.append (f"scoreboard players add {entity} {varName} {expression.right.value}")
+                    temp.append (f"scoreboard players add {entity} {varName} {self.get_int(expression.right)}")
                 elif isinstance(expression.op, ast.Sub):
-                    temp.append (f"scoreboard players remove {entity} {varName} {expression.right.value}")
+                    temp.append (f"scoreboard players remove {entity} {varName} {self.get_int(expression.right)}")
                 else:
-                    if expression.right.value not in self.pNumbers:
-                        self.pNumbers.append(expression.right.value)
+                    if self.get_int(expression.right) not in self.pNumbers:
+                        self.pNumbers.append(self.get_int(expression.right))
                     elif isinstance(expression.op, ast.Mult):
-                        temp.append (f"scoreboard players operation {entity} {varName} *= {expression.right.value} p-numbers")
+                        temp.append (f"scoreboard players operation {entity} {varName} *= {self.get_int(expression.right)} p-numbers")
                     elif isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
-                        temp.append (f"scoreboard players operation {entity} {varName} /= {expression.right.value} p-numbers")
+                        temp.append (f"scoreboard players operation {entity} {varName} /= {self.get_int(expression.right)} p-numbers")
                     elif isinstance(expression.op, ast.Mod):
-                        temp.append (f"scoreboard players operation {entity} {varName} %= {expression.right.value} p-numbers")
+                        temp.append (f"scoreboard players operation {entity} {varName} %= {self.get_int(expression.right)} p-numbers")
             else:
                 entity, varName = self.parse_var(expression.right)
                 
@@ -537,6 +809,68 @@ class KCF:
                     temp.append (f"scoreboard players operation {entity} {varName} %= {entity1} {varName1}")
         return temp
     
+    def ifexpr(self, expression: ast.If, filename: str):
+        condition = self.parse_condition(expression.test)               
+        
+        # Multiple ifs can get janky: if0_if0_if0.... 
+        if '_if' in filename:
+            temp = ''
+            for i in range(0, len(filename), -1):
+                t = filename[i]
+                if t.isdigit():
+                    temp += t
+                else:
+                    fname = f"{filename.replace(f'_if{temp}'), f'_if{int(temp) + 1}'}"
+            else:
+                fname = f"{filename}_if{self.conditions}"
+        else:
+            fname = f"{filename}_if{self.conditions}"
+    
+        # Add one if to counter
+        self.conditions += 1
+
+        # Expression 
+        if isinstance(expression.orelse, ast.Call):
+            condition = condition.replace("%end%", f"run function {self.namespace}:{fname}")
+
+            self.write(fname, self.parse([ast.Expr(value=expression.body)], fname))            
+            
+            return (condition)
+
+        # If not complex (not IF ELSE)
+        elif len(expression.orelse) == 0:
+            code = self.parse(expression.body, fname)
+
+            # Optimize: If it is only one statement, don't create a new file
+            if code.count('\n') == 0:
+                condition = condition.replace("%end%", "run " + code)
+            else:
+                condition = condition.replace("%end%", f"run function {self.namespace}:{fname}")
+                self.write(fname, self.parse(expression.body, fname))            
+                
+            return condition
+
+        else:
+            # Use multiple files. 
+
+            # In new file, return if true. If it doesn't run, then the else statement is ran (other function runs)
+            # Minimize file usage by APPENDING using write function. 
+            # Because, if IF statement runs, the function returns, so code can be directly appended below the if statement
+
+            body = self.parse(expression.body, fname + "t")
+
+            # Do not write if only one line
+            if body.count("\n") == 0:
+                condition = condition.replace("%end%", f"run return run {body}")
+            else:
+                condition = condition.replace("%end%", f"run return run function {self.namespace}:{fname}t")
+                self.write(fname + "t", body)
+
+            self.write(fname, condition + "\n" + self.parse(expression.orelse, fname))
+
+            return (f"function {self.namespace}:{fname}")
+    
+
     def parse(self, parsed: list[ast.FunctionDef], filename = ""):
         cmds = []
 
@@ -544,7 +878,7 @@ class KCF:
             if debug: print(ast.dump(expression))
 
             if isinstance(expression, ast.FunctionDef):
-                self.write(expression.name, self.parse(expression.body, expression.name))
+                self.write(expression.name, self.parse(expression.body, expression.name.lower()))
                 
             elif isinstance(expression, ast.Assign):
                 cmds.append(self.assign(expression))
@@ -563,7 +897,7 @@ class KCF:
                     # IF THERE ARE NO ARGUMENTS, run USER defined function, otherwise run built-in
 
                     if len(expression.value.args) == 0:
-                        funcname = expression.value.func.id
+                        funcname = expression.value.func.id.lower()
                         funcname = funcname.replace("__", '/')
                         cmds.append(f"function {self.namespace}:{funcname}")
                     else:
@@ -588,36 +922,13 @@ class KCF:
                             case "label":
                                 self.labels[args[0].value] = args[1].value
                             case _:
-                                cmd = self.command(func, args)
+                                cmd = self.command(func, args, filename)
                                 cmds.append(cmd)
-                        
+                # IF
+                elif isinstance(expression.value, ast.IfExp):
+                    cmds.append(self.ifexpr(expression.value, filename))
             elif isinstance(expression, ast.If):
-                temp = self.parse_condition(expression.test)               
-                
-                fname = f"{filename}_if{self.conditions}"
-                
-                # If not complex (not IF ELSE)
-                if len(expression.orelse) == 0:
-
-                    temp = temp.replace("%end%", f"run function {self.namespace}:{fname}")
-                    cmds.append(temp)
-
-                    self.write(fname, self.parse(expression.body, fname))
-                else:
-                    # Use multiple files. 
-                    cmds.append(f"function {self.namespace}:{fname}")
-
-                    # In new file, return if true. If it doesn't run, then the else statement is ran (other function runs)
-                    # Minimize file usage by APPENDING using write function. 
-                    # Because, if IF statement runs, the function returns, so code can be directly appended below the if statement
-                    temp = temp.replace("%end%", f"run return run function {self.namespace}:{fname}t")
-
-
-                    self.write(fname, temp + "\n" + self.parse(expression.orelse, fname))
-                    self.write(fname + "t", self.parse(expression.body, fname + "t"))
-                
-                # Add one if to counter
-                self.conditions += 1
+                cmds.append(self.ifexpr(expression, filename))
             elif isinstance(expression, ast.While):
                 # NOTICE: WHILE..ELSE does NOT WORK, and will NOT be planned to be made anytime soon
 
@@ -676,7 +987,7 @@ class KCF:
     def add_extras(self):
         # ADD VARIABLES
         for var, t in self.variables.items():
-            if t == 'dummy':
+            if t == 'dummy' and var != '.temp':
                 v = f"scoreboard objectives add {var} dummy"
                 if v not in self.files['load'].splitlines():
                     self.files['load'] = v + "\n" + self.files['load']

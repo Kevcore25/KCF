@@ -28,6 +28,8 @@ class FillHandler(SetblockHandler): "The handler for fill"
 hollow: FillHandler
 outline: FillHandler
 
+class FormattedString: "A special f-string"
+
 class function: "A defined function"
 class Label: "A generic label to replace some types.\n\nLabels are global once declared, so ideally it should be at the top of the file.\n\nHowever, you may want to add them when needed for organization."
 
@@ -175,3 +177,119 @@ def summon(Entity: Entity | str | Label, Position: str = "~ ~ ~", Properties: di
 
     As of V.2.0, the properties parameter does NOT work. Please use a str based property, like: `summon(zombie, "~ ~ ~", "{glowing: true}")`
     """
+
+def attribute(Entity: Entity, Attribute: str | Attribute, Value: float = None):
+    """
+    Sets the base value of an attribute.
+    If the value is not specified it is returned instead
+
+    Example: `attribute(self, "attack_damage", 1.0)`
+    """
+
+def resetattribute(Entity: Entity, Attribute: str):
+    """
+    Resets the base value of an attribute.
+
+    Example: `resetattribute(self, "attack_damage")`
+    """
+
+# def bossbar(Option: str):
+#     """
+#     Function for bossbar related things.
+
+#     Option must be specified which has different parameters:
+
+#     **create**: Create a new bossbar.
+#     Args: `id: str`, `name: str`
+    
+#     **get**: Get a bossbar attribute
+#     Args: `id: str`, `option: str`.
+#     * option: Can be of: max, players, value, visible
+
+#     **remove**: Remove a bossbar.
+#     Args: `id: str`
+    
+
+#     **set**
+#     """
+
+def dialog(Player: Player, Id: str):
+    """
+    Shows a dialog to a player.
+
+    If no ID is specified, all displayed dialogs to that player are cleared.
+    """
+
+def enchant(Player: Player, Enchantment: str, Level: int):
+    """
+    Enchants the currently held item of the player with an enchantment
+
+    Example: `enchant(self, unbreaking, 3)`
+    """
+
+def kill(Entity: Entity):
+    """
+    Kills an entity.
+    
+    Due to its simplistic nature and more complex functionalities, you may want to use the run command instead.
+    """
+
+def getplayers(Variable):
+    """
+    Gets the number of players on the server and stores it into a variable.
+
+    Example: `getplayers(var1)`
+    """
+
+def randint(Variable, min: int, max: int):
+    """
+    Stores a random number to a variable.
+
+    Example: `randint(self.var1, 1, 10)`
+    """
+
+def tellraw(Player: Player, Message: FormattedString):
+    """
+    Tells a player a message in chat.
+
+    Example: `tellraw(self, "#bold,red#Your current score is {self.score}")`
+    """
+
+def title(Player: Player, Message: FormattedString):
+    """
+    Shows a title to a player.
+
+    This is used in conjunction with the times function.
+    
+    Example: 
+    ```
+    times(self, 5, 20, 5)
+    title(self, "#bold,red#Your current score is {self.score}")
+    ```
+    """
+
+def subtitle(Player: Player, Message: FormattedString):
+    """
+    Shows a subtitle to a player.
+
+    A title MUST be displayed in order to display the subtitle, which also uses the times function
+
+    Example: 
+    ```
+    times(self, 5, 20, 5)
+    title(self, "")
+    subtitle(self, f"   {self.stamina: var | yellow}")
+    ```
+    """
+
+def times(Player: Player, FadeIn: int, DisplayTime: int, FadeOut: int):
+    """
+    The time for the title to show in ticks.
+
+    You may also use a shortcut with a String instead, see example 2.
+
+    Example 1: `times(self, 5, 20, 5)`
+
+    Example 2: `times(self, "5 20 5")`
+    """
+    

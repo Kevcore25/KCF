@@ -21,20 +21,20 @@ def displaystamina():
     self.actualstamina = self.stamina / 100
     
     # Display
-    run('title @s title ""')    
-    run('title @s times 0 5 5')
+    title(self, "")
+    times(self, 0, 5, 5)
     # Change colour based on how low stamina is
     if self.stamina < 1000:
-        run('title @s subtitle ["       ", {score: {objective: "actualstamina", name: "@s"}, color: "red"}]')
+        subtitle(self, f"       {self.actualstamina: var | red}")
     elif self.stamina < 2500:
-        run('title @s subtitle ["       ", {score: {objective: "actualstamina", name: "@s"}, color: "gold"}]')
+        subtitle(self, f"       {self.actualstamina: var | orange}")
     else:
-        run('title @s subtitle ["       ", {score: {objective: "actualstamina", name: "@s"}, color: "yellow"}]')
+        subtitle(self, f"       {self.actualstamina: var | yellow}")
 
 def regenstamina():   
     # Regenerates stamina using a quadratic scale 
     self.stamina += 25
-    self.stamina *= 1.02 # KCF-Py only accepts up to 3 decimal precisions
+    self.stamina *= 1.02 # KCF-Py only accepts up to 2 decimal precisions
 
     if self.stamina > self.currentMax:
         self.stamina = self.currentMax
@@ -58,9 +58,9 @@ def nostamina():
 
     # As of previous versions, the attribute function does not exist.
     # This also shows that you can still use MC commands within KCF-Py
-    run("attribute @s jump_strength base set 0")
-    run("attribute @s attack_damage base set -1000")
-    run("attribute @s block_interaction_range base set 0")
+    attribute(self, jump_strength, 0)
+    attribute(self, attack_damage, -1000)
+    attribute(self, block_interaction_range, 0)
 
     # As of previous versions, bool vars do not exist so a int is used instead
     # This is to ensure that the max stamina increases from "exercising"
@@ -70,9 +70,10 @@ def nostamina():
         self.currentMax += 50
 
 def hasstamina():
-    run("attribute @s jump_strength base set 0.42")
-    run("attribute @s attack_damage base set 1")
-    run("attribute @s block_interaction_range base set 4.5")
+    # Reset modified attributes
+    resetattribute(self, jump_strength)
+    resetattribute(self, attack_damage)
+    resetattribute(self, block_interaction_range)
 
     if self.stamina == self.currentMax:
         self.increased = 0
