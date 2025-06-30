@@ -252,8 +252,13 @@ class KCF:
         """
         Get an int OR float value within bounds.
         """
-
-        num = self.get_int(value)
+        if isinstance(value.value, int):
+            num = self.get_int(value)
+        elif isinstance(value.value, float):
+            num = value.value
+        else:
+            self.raise_error(None, f"Value is not a number!", ast.unparse(value))
+            num = value.value
 
         if (min is not None and max is not None) and not (min <= num <= max):
             self.raise_error(None, f"Number must be between {min} and {max}!", ast.unparse(value), 1)
@@ -274,7 +279,7 @@ class KCF:
 
             return value.id
         elif isinstance(value, ast.Constant):
-            if not isinstance(value.value, str) or allowNonStr:
+            if isinstance(value.value, str) or allowNonStr:
                 return value.value
             else:
                 self.raise_error(None, "Value must be a str!", ast.unparse(value), 2)
@@ -378,7 +383,7 @@ class KCF:
     def warn(self, message: str):
         self.warnings.append(message)
 
-    def get_int(self, value: ast.Constant | ast.UnaryOp):
+    def get_int(self, value: ast.Constant | ast.UnaryOp, allowNonInt: bool = False):
         """
         Get the integer value of an ast obj.
         If it is negative it uses UnaryOp so this fixes it.
@@ -386,7 +391,7 @@ class KCF:
         # If it is negative it is a unary op for some reason
         if isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
             return -value.operand.value
-        elif not (isinstance(value, ast.Constant) and isinstance(value.value, int)):
+        elif not (isinstance(value, ast.Constant) and isinstance(value.value, int)) and not allowNonInt:
             self.raise_error(None, "Value must be a valid integer!", ast.unparse(value))
         return value.value
 
@@ -923,7 +928,7 @@ class KCF:
                 # If self, e.g.                    
                 # # IF LABEL, aka starts with _:
                 if isinstance(var, ast.Name) and var.id.startswith("_"):
-                    self.labels[var.id[1:]] = self.get_int(expression.value)
+                    self.labels[var.id[1:]] = self.get_int(expression.value, allowNonInt=True)
 
                 else:
                     # If integer:

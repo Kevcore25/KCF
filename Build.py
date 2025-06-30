@@ -8,7 +8,7 @@ In KCF, I will call it "building" but know that it is more of a "translating" pr
 
 CONFIG_FILE = r"BuildConfig.json"
 
-PACK_VERSION = 71 # 71 is 1.21.5
+PACK_VERSION = 80 # 71 is 1.21.5
 
 import json, KCFPy
 import shutil, os

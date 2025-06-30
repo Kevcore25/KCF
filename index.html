@@ -215,8 +215,11 @@ def onnewjoin():
                 if (!response.ok) {
                     const error = await response.text();
 
-                    statusDiv.textContent = error;
+                    statusDiv.textContent = 'There was an error processing your code';
                     statusDiv.classList.add('error');
+
+                    outputDiv.textContent = error;
+
                 } else {
 
                     // Get the blob data

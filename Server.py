@@ -1,13 +1,13 @@
 """
 Simple flask application
 """
-PACK_VERSION = 71
+PACK_VERSION = 80
 from flask import Flask, request, jsonify, send_file, make_response
 import json
 import sys
 import tempfile
 import time
-import os, ast
+import os
 import KCFPy
 import shutil
 
@@ -48,8 +48,6 @@ def compile():
                 sys.stdout = f
                 try:
                     size = 50
-                    print("Initializing KCF-Py...")                    
-
                     print('\n' + '=' * size + "\n")
                     print(f"KC Function Builder Version {KCFPy.VERSION}")
                     print("Create Minecraft Datapacks with Python!")
@@ -57,15 +55,12 @@ def compile():
                     print('=' * size + "\n")
 
                     lastTime = time.time()
-                    codeTree = ast.parse(code)
 
-                    t = KCFPy.KCF(codeTree.body)
+                    t = KCFPy.KCF(code)
 
                     # Modify namespace
                     t.namespace = "kcf"
                     namespace = 'kcf'
-
-                    runtime()
 
                     # Build to memory
                     print("Building code...")
@@ -73,7 +68,7 @@ def compile():
 
                     runtime()
 
-                    print("Creating datapack structure...")
+                    print("Writing code...")
                     # Create datpack
                     join = os.path.join
 
@@ -91,7 +86,7 @@ def compile():
                     mkfile(join(name, "pack.mcmeta"), json.dumps({
                         "pack": {
                             "pack_format": PACK_VERSION,
-                            "description": "Created with KCF-Py Version 1.0"
+                            "description": "Created with KCF-Py"
                         }
                     }, indent=4))
 
@@ -113,11 +108,6 @@ def compile():
                         ]
                     }))
 
-                    runtime()
-
-                    # Write
-                    print("Writing code...")
-
                     destination = "."
 
                     mkdir(destination)
@@ -125,16 +115,18 @@ def compile():
                     dest = join(destination, name, "data", namespace, "function")
 
                     t.write_files(dest)
-                    runtime()
 
-                    print("Zipping file")
                     # with zipfile.ZipFile(output_path, 'w') as zipf:
                     #     for file_path in os.listdir(os.path.join(destination, name)):
                     #         zipf.write(file_path)
                     shutil.make_archive('tempfile', 'zip', os.path.join(destination, name))
                     runtime()
 
-                    print("Build done! Printed contents:")
+                    print("Build done!")
+
+                    t.print_warnings()
+
+                    print("Printed contents:")
                     
                     t.print()
                 finally:
