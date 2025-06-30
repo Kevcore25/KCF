@@ -1,13 +1,16 @@
 import ast, json, os, re
 
 # Version stuff
-VERSION = 3.0
+VERSION = 4.0
 VERSION_HIGHLIGHTS = """
-3.0 Changes:
-* Forced all function names to be lowered
-* "Function" type now accepts both a function name, or a function call
-* Added FormattedString for title/tellraw commands
-* Added a bunch of commonly used commands
+4.0 Changes:
+* Improved error-handling
+* Warning / Error messages
+* More MC functions
+* Function macros (Custom functions accept arguments)
+* Non-int variables for macros
+* Dictionary acceptance instead of string
+* "not" operation for conditionals (if not entity(self))
 """
 
 # Turn debug mode on or off
@@ -16,15 +19,18 @@ debug = False
 colors = {
     'red':'red',
     'orange':'gold',
+    'gold':'gold',
     'yellow':'yellow',
     'green':'green',
     'aqua':'aqua',
     'blue':'blue',
     'dark_blue':'dark_blue',
     'dark_aqua':'dark_aqua',
+    'dark_purple':'dark_purple',
     'purple':'dark_purple',
     'pink':'light_purple',
     'magenta':'light_purple',
+    'light_purple':'light_purple',
     'black':'black',
     'gray':'gray',
     'grey':'gray',
