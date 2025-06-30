@@ -128,7 +128,7 @@ def give(Player: SelectorEntity | str | Label, Item: Item | str, Count: int = 1,
     If ItemComponents is specified, the item MUST be of Item type and not a string for compatability.
     Otherwise, it may break the code.
 
-    Example: `give(all, "diamond_sword")`
+    Example: `give(all, diamond_sword)`
 
     Example 2:
     ```
@@ -136,9 +136,14 @@ def give(Player: SelectorEntity | str | Label, Item: Item | str, Count: int = 1,
     _within10 = "@a[distance=..10]"
     give(_within10, diamond_sword, 1, {enchantments: {unbreaking: 3}})
     ```
+
+    Example 3:
+    ```
+    give("@a[distance=..10]", "diamond_sword", 1, {'enchantments': {'unbreaking': 3}})
+    ```
     """
 
-def effect(Entity: SelectorEntity | str | Label, Effect: Effect | str, Duration: int = 30, Amplifier: int = 0):
+def effect(Entity: SelectorEntity | str | Label, Effect: Effect | str, Duration: int = 30, Amplifier: int = 0, ShowParticles: bool = False):
     """
     Gives an effect to an entity.
     Use the cleareffect function to clear an effect for an entity.
@@ -149,13 +154,14 @@ def effect(Entity: SelectorEntity | str | Label, Effect: Effect | str, Duration:
     ```
     # Labels must start with underscore (_)
     _within10 = "@a[distance=..10]"
-    effect(_within10, slowness, 10, 1)
+    effect(_within10, slowness, 10, 1, True)
     ```
     """
 
-def cleareffect(Entity: SelectorEntity | str | Label, Effect: Effect | str):
+def cleareffect(Entity: SelectorEntity | str | Label, Effect: Effect | str = None):
     """
     Clears an effect from an entity.
+    If Effect is not specified, all effects are cleared
 
     Example: `cleareffect(all, slowness)`
     """
@@ -174,19 +180,20 @@ def summon(Entity: Entity | str | Label, Position: str = "~ ~ ~", Properties: di
     Example: `summon(zombie)`
 
     Example 2: `summon(zombie, "~ ~ ~", {glowing: true})`
-
-    As of V.2.0, the properties parameter does NOT work. Please use a str based property, like: `summon(zombie, "~ ~ ~", "{glowing: true}")`
     """
 
-def attribute(Entity: Entity, Attribute: str | Attribute, Value: float = None):
+def attribute(Entity: SelectorEntity, Attribute: str | Attribute, Value: float = None):
     """
     Sets the base value of an attribute.
-    If the value is not specified it is returned instead
+    If the value is not specified it is returned instead.
+    **The entity selector MUST BE singular**, so "all" does not work.
 
-    Example: `attribute(self, "attack_damage", 1.0)`
+    Example 1: `attribute(self, "attack_damage", 1.0)`
+
+    Example 2: `execute("as @a", lambda: attribute(self, "attack_damage", 1.0))`
     """
 
-def resetattribute(Entity: Entity, Attribute: str):
+def resetattribute(Entity: SelectorEntity, Attribute: str):
     """
     Resets the base value of an attribute.
 
@@ -213,7 +220,7 @@ def resetattribute(Entity: Entity, Attribute: str):
 #     **set**
 #     """
 
-def dialog(Player: Player, Id: str):
+def dialog(Player: Player, ID: str):
     """
     Shows a dialog to a player.
 
@@ -227,7 +234,7 @@ def enchant(Player: Player, Enchantment: str, Level: int):
     Example: `enchant(self, unbreaking, 3)`
     """
 
-def kill(Entity: Entity):
+def kill(Entity: SelectorEntity):
     """
     Kills an entity.
     
@@ -248,14 +255,24 @@ def randint(Variable, min: int, max: int):
     Example: `randint(self.var1, 1, 10)`
     """
 
-def tellraw(Player: Player, Message: FormattedString):
+def tellraw(Player: Player, Message: FormattedString | str):
     """
     Tells a player a message in chat.
 
     Example: `tellraw(self, "#bold,red#Your current score is {self.score}")`
     """
 
-def title(Player: Player, Message: FormattedString):
+def actionbar(Player: Player, Message: FormattedString | str):
+    """
+    Shows a message to a player's actionbar.
+    
+    Example: 
+    ```
+    actionbar(self, "#bold,red#Your current score is {self.score}")
+    ```
+    """
+
+def title(Player: Player, Message: FormattedString | str):
     """
     Shows a title to a player.
 
@@ -268,7 +285,7 @@ def title(Player: Player, Message: FormattedString):
     ```
     """
 
-def subtitle(Player: Player, Message: FormattedString):
+def subtitle(Player: Player, Message: FormattedString | str):
     """
     Shows a subtitle to a player.
 
@@ -292,4 +309,154 @@ def times(Player: Player, FadeIn: int, DisplayTime: int, FadeOut: int):
 
     Example 2: `times(self, "5 20 5")`
     """
+
+def say(Message: str):
+    """
+    Say a message in chat.
+    The message is executed as the current user, e.g. Server
+
+    Example: `say("hello world!")`
+    """
+
+def print(Message: FormattedString | str):
+    """
+    An alternative to tellraw(all, <message>)
+
+    This function is NOT a substitute for normal print statements!
+    Rather, it is a shortcut for global messages.
     
+    Example: `print(f"User1 has {user1.var} var")`
+    """
+
+def tparound(Entity: SelectorEntity | Label | str, Distance: float, MaxDistance: float = None):
+    """
+    A shortcut to the spreadplayers command.
+    Center is set as ~ ~ ~ (current pos).
+    Respect teams is false.
+
+    If MaxDistance is not specified, it will be set to Distance.
+
+    Example 1: `tparound(all, 500)`
+
+    Example 2: `tparound(all, 500, 600)`
+    """
+
+def tag(Entity: SelectorEntity | Label | str, Tag: str | Label):
+    """
+    Give an entity a tag.
+
+    Example: `tag(self, mytag)`
+    """
+
+def removetag(Entity: SelectorEntity | Label | str, Tag: str | Label):
+    """
+    Removes a tag from an entity.
+
+    Example: `removetag(self, mytag)`
+    """
+
+def inversetag(Tag: str | Label):
+    """
+    Inverses the tag from the **current** entity.
+    
+    Essentially, this is self.tag = !self.tag OR self.tag = not self.tag
+
+    Example: `inversetag(mytag)`
+    """
+
+def wait(Amount: str, Function: function):
+    """
+    An alias to the schedule function.
+    It schedules a function after a specified time.
+
+    NOTE: Wait function does NOT hang your code!
+    
+    Example: `wait("1s", myfunc)`
+    """
+
+def schedule(Amount: str, Function: function):
+    """
+    Schedules a function to be ran at a later time.
+
+    Valid formats are:
+    * <tick>t for ticks
+    * <sec>s for seconds
+
+    Eg. "1t" for 1 tick and "2s" for 2 seconds
+
+    Example: `wait("1s", myfunc)`
+    """
+
+class Gamemode: "Player Gamemode"
+survival: Gamemode
+creative: Gamemode
+spectator: Gamemode
+adventure: Gamemode
+
+def gamemode(Players: Player, Gamemode: Gamemode):
+    """
+    Sets the gamemode of a player or players
+
+    Example: `gamemode(self, creative)`
+    """
+
+def add(Variable: str, Value: int):
+    """
+    Adds a value to a variable.
+    It is equivalent to var += value.
+
+    It is mostly used in a non-expression cases.
+
+    Example: `execute('as @a', add('self.var1', 1))`
+    """
+
+def subtract(Variable: str, Value: int):
+    """
+    Subtracts a value to a variable.
+    It is equivalent to var -= value.
+
+    It is mostly used in a non-expression cases.
+
+    Example: `execute('as @a', subtract('self.var1', 1))`
+    """
+
+def multiply(Variable: str, Value: int):
+    """
+    Multiplies a value to a variable.
+    It is equivalent to var *= value.
+
+    It is mostly used in a non-expression cases.
+
+    Example: `execute('as @a', divide('self.var1', 2))`
+    """
+
+def divide(Variable: str, Value: int):
+    """
+    Divides a value to a variable.
+    It is equivalent to var /= value.
+
+    It is mostly used in a non-expression cases.
+
+    Example: `execute('as @a', divide('self.var1', 0.5))`
+    """
+
+def sub(Variable: str, Value: int):
+    """
+    Alias to subtract.
+    
+    Example: `execute('as @a', sub('self.var1', 1))`
+    """
+
+def mult(Variable: str, Value: int):
+    """
+    Alias to multiply.
+    
+    Example: `execute('as @a', mult('self.var1', 2))`
+    """
+
+def div(Variable: str, Value: int):
+    """
+    Alias to divide.
+    
+    Example: `execute('as @a', div('var1', 2))`
+    """

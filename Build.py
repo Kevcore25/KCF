@@ -10,7 +10,7 @@ CONFIG_FILE = r"BuildConfig.json"
 
 PACK_VERSION = 71 # 71 is 1.21.5
 
-import json, ast, KCFPy
+import json, KCFPy
 import shutil, os
 
 
@@ -32,17 +32,19 @@ name = configs['Datapack Name']
 source = configs['Build Source File']
 destination = configs['Build Destination']
 description = configs['Datapack Description']
+error_threshold = configs['Error Threshold']
 
 # Get Code
 print("Getting code...")
 with open(source, 'r') as f:
-    codeTree = ast.parse(f.read())
+    code = f.read()
 
 print("Initializing KCF...")
-t = KCFPy.KCF(codeTree.body)
+t = KCFPy.KCF(code)
 
-# Modify namespace
+# Modify vars
 t.namespace = namespace
+t.ERROR_THRESHOLD = error_threshold
 
 print("Building code...")
 # Build to memory
@@ -111,5 +113,5 @@ t.write_files(dest)
 
 # print("Done!")
 # input("Press enter to continue...\t")
-
 t.print()
+t.print_warnings()

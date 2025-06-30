@@ -13,7 +13,6 @@ VERSION_HIGHLIGHTS = """
 # Turn debug mode on or off
 debug = False
 
-
 colors = {
     'red':'red',
     'orange':'gold',
@@ -29,8 +28,6 @@ colors = {
     'black':'black',
     'gray':'gray',
     'grey':'gray',
-    'light_gray':'light_gray',
-    'light_grey':'light_gray',
     'dark_gray':'dark_gray',
     'dark_grey':'dark_gray',
     'white':'white'
@@ -216,7 +213,7 @@ class KCF:
 
         self.namespace = 'kcf'
 
-        self.precision = 3
+        self.warnings = []
 
         # PRESET CODE
         self.files = {
@@ -243,16 +240,40 @@ class KCF:
         self.pNumbers = []
         self.tempi = 0
 
+        self.ERROR_THRESHOLD = 1
 
-    def get_value(self, val) -> str:
-        if isinstance(val, ast.Name):
-            if val.id.startswith("_"):
-                return self.labels[val.id[1:]]
-            return val.id
-        elif isinstance(val, ast.Constant):
-            return val.value
-        elif isinstance(val, ast.Attribute):
-            return self.get_value(val.value) + "." + val.attr
+    def get_lim_num(self, value: ast.Constant, min: int | None = -2147483647, max: int | None = 2147483647) -> int | float:
+        """
+        Get an int OR float value within bounds.
+        """
+
+        num = self.get_int(value)
+
+        if (min is not None and max is not None) and not (min <= num <= max):
+            self.raise_error(None, f"Number must be between {min} and {max}!", ast.unparse(value), 1)
+        elif min is None and not num <= max:
+            self.raise_error(None, f"Number must be less than or equal to {max}!", ast.unparse(value), 1)
+        elif max is None and not min <= num:
+            self.raise_error(None, f"Number must be more than or equal to {min}!", ast.unparse(value), 1)
+
+        return num
+
+    def get_value(self, value, allowNonStr: bool = False) -> str:
+        if isinstance(value, ast.Name):
+            if value.id.startswith("_"):
+                try:
+                    return self.labels[value.id[1:]]
+                except KeyError:
+                    self.raise_error(None, "Label is not found!", value.id)
+
+            return value.id
+        elif isinstance(value, ast.Constant):
+            if not isinstance(value.value, str) or allowNonStr:
+                return value.value
+            else:
+                self.raise_error(None, "Value must be a str!", ast.unparse(value), 2)
+        elif isinstance(value, ast.Attribute):
+            return self.get_value(value.value) + "." + value.attr
         
     def get_dict(self, dictionary: ast.Dict) -> dict:
         new = {}
@@ -266,7 +287,10 @@ class KCF:
             else:
                 val = self.get_value(val)
 
-            new[key.id] = val
+            if isinstance(key, ast.Name):
+                new[key.id] = val
+            elif isinstance(key, ast.Constant):
+                new[key.value] = val
 
         if debug: print(new)
         return new
@@ -299,7 +323,7 @@ class KCF:
                                 entity, varName = self.parse_var(value.value)
                                 temp = {"score": {"objective": varName, "name": entity}}
                             case "entity" | "player" | "selector":
-                                temp = {"selector": self.get_entity(self.get_value(value.value))}
+                                temp = {"selector": self.parse_entity((value.value))}
 
                         # Apply colour
                         if c is not None:
@@ -319,11 +343,11 @@ class KCF:
         else:
             return ""
 
-    def get_func(self, function: ast.Name | ast.Lambda, filename: str = ""):
+    def get_func(self, function: ast.Name | ast.Lambda | ast.Call, filename: str = ""):
         if isinstance(function, ast.Name):
-            return f"function {self.namespace}:{function.id}" 
+            return f"function {self.namespace}:{function.id.replace('__', '/').lower()}" 
         elif isinstance(function, ast.Lambda):                
-            fname = filename + f'_lmb{self.conditions}'
+            fname = (filename + f'_lmb{self.conditions}').replace('__', '/').lower()
             self.conditions += 1
 
             code = self.parse([ast.Expr(value=function.body)], fname)
@@ -333,7 +357,7 @@ class KCF:
                 self.write(fname, code)
                 return f"function {self.namespace}:{fname}"
         elif isinstance(function, ast.Call):
-            fname = filename + f'_lmb{self.conditions}'
+            fname = (filename + f'_lmb{self.conditions}').lower()
             self.conditions += 1
 
             code = self.parse([ast.Expr(value=function)], fname)
@@ -343,16 +367,27 @@ class KCF:
                 self.write(fname, code)
                 return f"function {self.namespace}:{fname}"
 
-        raise TypeError("Not a valid function")
+        self.raise_error(filename, "Not a valid function type", ast.unparse(function), 4)
     
+    def warn(self, message: str):
+        self.warnings.append(message)
+
     def get_int(self, value: ast.Constant | ast.UnaryOp):
+        """
+        Get the integer value of an ast obj.
+        If it is negative it uses UnaryOp so this fixes it.
+        """
         # If it is negative it is a unary op for some reason
         if isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
             return -value.operand.value
-        else:
-            return value.value
+        elif not (isinstance(value, ast.Constant) and isinstance(value.value, int)):
+            self.raise_error(None, "Value must be a valid integer!", ast.unparse(value))
+        return value.value
 
-    def command(self, cmd: str, args: list[ast.Constant, ast.Attribute, ast.Name], filename: str = "") -> str:
+    def command(self, cmd: str, args: list[ast.Constant, ast.Attribute, ast.Name], filename: str = "", expression = None) -> str:
+        """
+        Extra commands, intended for MC commands
+        """
         match cmd:
             case "setblock":
                 if len(args) == 2:
@@ -371,43 +406,49 @@ class KCF:
             
             case "effect":
                 if len(args) == 2:
-                    return f"effect give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}"
+                    return f"effect give {self.parse_entity((args[0]))} {self.get_value(args[1])}"
                 elif len(args) == 3:
-                    return f"effect give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} {args[2].value}"
+                    return f"effect give {self.parse_entity((args[0]))} {self.get_value(args[1])} {args[2].value}"
                 elif len(args) == 4:
-                    return f"effect give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} {args[2].value} {args[3].value}"
+                    return f"effect give {self.parse_entity((args[0]))} {self.get_value(args[1])} {args[2].value} {args[3].value}"
+                elif len(args) == 5:
+                    return f"effect give {self.parse_entity((args[0]))} {self.get_value(args[1])} {args[2].value} {args[3].value} {str(args[4].value).lower()}"
                 
             case "cleareffect":
-                return f"effect clear {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}"
+                if len(args) == 1:
+                    return f"effect clear {self.parse_entity((args[0]))}"
+                elif len(args) == 2:
+                    return f"effect clear {self.parse_entity((args[0]))} {self.get_value(args[1])}"
 
             case "give":
                 if len(args) == 2:
-                    return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} 1"
+                    return f"give {self.parse_entity((args[0]))} {self.get_value(args[1])} 1"
                 elif len(args) == 3:
-                    return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} {args[2].value}"
+                    return f"give {self.parse_entity((args[0]))} {self.get_value(args[1])} {self.get_lim_num(args[2], min=1)}"
                 elif len(args) == 4:
                     components = self.get_dict(args[3])
                     new = []
                     # Due to how MC components work, the first one instead of being : must be =
                     for k, v in components.items():
-                        new.append(f"{k}={json.dumps(v)}")
+                        new.append(f"{k}={self.parse_primative_dict(v)}")
 
-                    return f"give {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])}[{','.join(new)}] {args[2].value}"
+                    return f"give {self.parse_entity((args[0]))} {self.get_value(args[1])}[{','.join(new)}] {self.get_lim_num(args[2], min=1)}"
+                
             case "summon":
                 if len(args) == 1:
                     return f"summon {self.get_value(args[0])}"
                 elif len(args) == 2:
                     return f"summon {self.get_value(args[0])} {self.get_value(args[1])}"
                 elif len(args) == 3:
-                    return f"summon {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])}"
+                    return f"summon {self.get_value(args[0])} {self.get_value(args[1])} {self.parse_dict(args[2])}"
 
             case "attribute":
                 if len(args) == 2:
-                    return f"attribute {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} base get"
+                    return f"attribute {self.parse_entity((args[0]))} {self.get_value(args[1])} base get"
                 elif len(args) == 3:
-                    return f"attribute {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} base set {self.get_int(args[2])}"
+                    return f"attribute {self.parse_entity((args[0]))} {self.get_value(args[1])} base set {self.get_lim_num(args[2], -2048, 2048)}"
             case "resetattribute":
-                return f"attribute {self.get_entity(self.get_value(args[0]))} {self.get_value(args[1])} base reset"
+                return f"attribute {self.parse_entity((args[0]))} {self.get_value(args[1])} base reset"
 
             # CREATORS: Just use the RUN function for now.
             # case "bossbar":
@@ -419,16 +460,16 @@ class KCF:
                 if len(args) == 1:
                     return f"dialog clear {self.get_player(args[0])}"
                 elif len(args) == 2:
-                    return f"dialog show {self.get_player(args[0])}{self.get_value(args[1])}"
+                    return f"dialog show {self.get_player(args[0])} {self.get_value(args[1])}"
                 
             case "enchant":
                 if len(args) == 2:
                     return f"enchant {self.get_player(args[0])} {self.get_value(args[1])}"
                 elif len(args) == 3:
-                    return f"enchant {self.get_player(args[0])} {self.get_value(args[1])} {args[2].value}"
+                    return f"enchant {self.get_player(args[0])} {self.get_value(args[1])} {self.get_lim_num(args[2], 1, 5)}"
             
             case "kill":
-                return f"kill {self.get_entity(self.get_value(args[0]))}"
+                return f"kill {self.parse_entity(args[0])}"
             
             case "getplayers":
                 player, name = self.parse_var(args[0])
@@ -441,6 +482,9 @@ class KCF:
 
             case "tellraw":
                 return f"tellraw {self.get_player(self.get_value(args[0]))} {json.dumps(self.fstring(args[1]))}"
+               
+            case "actionbar":
+                return f"title {self.get_player(self.get_value(args[0]))} actionbar {json.dumps(self.fstring(args[1]))}"
             
             case "title":
                 return f"title {self.get_player(self.get_value(args[0]))} title {json.dumps(self.fstring(args[1]))}"
@@ -448,11 +492,94 @@ class KCF:
                 return f"title {self.get_player(self.get_value(args[0]))} subtitle {json.dumps(self.fstring(args[1]))}"
             case "times":
                 if len(args) == 4:
-                    return f"title {self.get_player(self.get_value(args[0]))} times {args[1].value} {args[2].value} {args[3].value}"
+                    return f"title {self.get_player(self.get_value(args[0]))} times {self.get_lim_num(args[1])} {self.get_lim_num(args[2])} {self.get_lim_num(args[3])}"
                 elif len(args) == 2:
                     return f"title {self.get_player(self.get_value(args[0]))} times {args[1].value}"
-               
-        raise TypeError(f"Function '{cmd}' failed to be parsed.")
+                
+            case "print":
+                return f"tellraw @a {json.dumps(self.fstring(args[0]))}"
+
+            case "say":
+                return f"say {args[0].value}"
+
+            case "tparound":
+                if len(args) == 2:
+                    return f"spreadplayers ~ ~ {args[1].value} {args[1].value} false {self.parse_entity((args[0]))}"
+                elif len(args) == 3:
+                    return f"spreadplayers ~ ~ {args[1].value} {args[2].value} false {self.parse_entity((args[0]))}"
+
+            case "tag":
+                return f"tag {self.parse_entity((args[0]))} add {self.get_value(args[1])}"
+            case "removetag":
+                return f"tag {self.parse_entity((args[0]))} remove {self.get_value(args[1])}"
+            case "inversetag":
+                return f"execute store success score .temptag .temp run tag @s add {self.get_value(args[0])}\nexecute if score .temptag .temp matches 0 run tag @s remove {self.get_value(args[0])}"
+
+            case "wait" | "schedule":
+                t = self.get_value(args[0], allowNonStr=True)
+                
+                # Add 't' implying ticks
+                if t.isdigit():
+                    t += 't'
+
+                return f"schedule function {self.namespace}:{self.get_value(args[1]).replace('__', '/').lower()} {t}"
+
+            case "gamemode":
+                return f"gamemode {self.get_value(args[1])} {self.get_player(self.get_value(args[0]))}"
+
+            case "add":
+                return self.aug_assign(ast.AugAssign(
+                    target = args[0],
+                    op = ast.Add(),
+                    value = args[1]
+                ))
+
+            case "subtract" | "sub":
+                return self.aug_assign(ast.AugAssign(
+                    target = args[0],
+                    op = ast.Sub(),
+                    value = args[1]
+                ))
+
+            case "multiply" | "mult":
+                return self.aug_assign(ast.AugAssign(
+                    target = args[0],
+                    op = ast.Mult(),
+                    value = args[1]
+                ))
+
+            case "divide" | "div":
+                return self.aug_assign(ast.AugAssign(
+                    target = args[0],
+                    op = ast.Div(),
+                    value = args[1]
+                ))
+
+
+            case _:
+                # Call custom function. Args must be of NAME value
+                result = []
+                for arg in args:
+                    val = self.parse_var_only(arg)                       
+                    if val in self.variables:
+                        if isinstance(self.variables[val], str) and self.variables[val] == 'dummy':
+                            entity, varName = self.parse_var(arg)
+                            result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
+                        else:
+                            result.append(f"data modify storage kcf:functionargs {val} set from storage kcf:vars {val}")
+
+                    elif isinstance(arg, ast.Constant):
+                        self.raise_error(filename, "Argument cannot be a pre-defined value. It must be a variable.", [arg.value, cmd], 2)
+
+                    else:
+                        entity, varName = self.parse_var(arg)
+                        result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
+
+                result.append(f'function {self.namespace}:{cmd.lower()} with {self.namespace}:functionargs')
+
+                return "\n".join(result)
+
+        self.raise_error(filename, f"Function '{cmd}' failed to be parsed. Check to see if your arguments are correct.", ast.unparse(expression), 1)
 
     def get_player(self, player: str):
         match player:
@@ -464,8 +591,36 @@ class KCF:
                 if player.startswith("_"):
                     return self.labels[player[1:]]
                 return player
-            
+    
+    def parse_entity(self, value: ast.Name | ast.Constant | ast.Attribute) -> str:
+        """
+        Parses an obj to an entity.
+        Use this instead of self.get_entity(self.get_value((...))
+        """
+        if isinstance(value, ast.Name) or isinstance(value, ast.Attribute):
+            # If it is just a var, use the double method (get ent(get val()))
+            return self.get_entity(self.get_value(value))
+        elif isinstance(value, ast.Subscript):
+            # Get entity - it has to be VAR so double method is used
+            ent = self.get_entity(self.get_value(value.value))
+            # Get sub
+            sub = self.get_value(value.slice)
+
+            # If @ then use [] otherwise use [name=]
+            return f"{ent}[{sub}]" if ent.startswith('@') else f"@a[name=\"{ent}\",{sub}]"
+        elif isinstance(value, ast.Constant):
+            if not isinstance(value.value, str):
+                self.raise_warning(None, "Constant entity should be a string datatype", ast.unparse(value))                
+            return value.value
+
+        else:
+            self.raise_error(None, "Invalid data type for entity!", ast.unparse(value))
+
     def get_entity(self, entity: str):
+        """
+        Given a STRING, detect whether it is self, all, etc.
+        Newer versions should use the parse_entity instead.
+        """
         match entity:
             case "all": return "@a"
             case "self": return "@s"
@@ -478,42 +633,9 @@ class KCF:
                     try:
                         return self.labels[entity[1:]]
                     except KeyError:
-                        raise NameError("Label is not found!")
+                        self.raise_error('?', "Label is not found!", entity)
                 return entity
-
-    def parse_get_var(self, var: str):
-        if "." in var:
-            entity, varname = var.split('.', 2)
-            return [self.get_entity(entity), varname]
-        elif var.isdigit():
-            if var not in self.pNumbers:
-                self.pNumbers.append(var)
-            return ['p-numbers', var]
-        else:
-            return ['#global', var]
-
-    def parse_message(self, message: str):
-        msg = []
-
-        while ("${" in message):
-            plain, vart = message.split("${", 1)
-            msg.append(plain)
-
-            varmsg = vart.split("}")[0]
-
-            var = self.parse_get_var(varmsg)
-
-            msg.append({"score": {"name": var[0], "objective": var[1]}})
-
-            message = message.split("}", 1)[1]
-        
-        msg.append(message)
-        
-        if msg[-1] == "":
-            msg.pop()
-
-        return json.dumps(msg)
-
+              
     def bool_to_if(self, value: bool):
         if value:
             y = "if"
@@ -524,7 +646,11 @@ class KCF:
 
         return y, n
     
-    def parse_condition(self, condition, starting = 'execute '):
+    def parse_condition(self, condition, starting = 'execute ', opp = False):
+        """
+        Complex algorithm that parses a conditional statement obj.
+        Currently does not work with OR statement.
+        """
         temp = starting
         add = True
         def cmpre(value, opp=False):
@@ -559,22 +685,30 @@ class KCF:
             elif isinstance(value, ast.Call):
                 match value.func.id:
                     case "entity":
-                        temp += f"{y} entity {self.get_entity(value.args[0].value)} "
+                        temp += f"{y} entity {self.parse_entity(value.args[0])} "
                     case "block":
                         temp += f"{y} block {self.get_value(value.args[0])} {self.get_value(value.args[1])} "
+                    case "tag":
+                        if len(value.args) == 1:
+                            temp += f"{y} entity @s[tag={self.get_value(value.args[0])}] "
+                        elif len(value.args) == 2:
+                            temp += f"{y} entity {self.parse_entity((value.args[0]))}[tag={self.get_value(value.args[1])}] "
+                        else:
+                            self.raise_error(None, "Tag condition has an invalid number of arguments!", ast.unparse(value))
                     case "custom":
                         temp += value.args[0].value + " "
 
+            elif isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.Not):
+                return cmpre(value.operand, not opp)
             elif isinstance(value, ast.BoolOp):
                 if isinstance(value.op, ast.And):
                     for v in value.values:
-                        cmpre(v)
+                        cmpre(v, opp)
                 elif isinstance(value.op, ast.Or):
-                    print('a', value.values)
                     temp += 'run '
                     t = []
                     for v in value.values:
-                        t.append(self.parse_condition(v))
+                        t.append(self.parse_condition(v, opp=opp))
                     temp += f'\n{temp}'.join(t)
                     add = False
             elif isinstance(value, ast.Constant):
@@ -584,36 +718,91 @@ class KCF:
                     # Put a random FALSE statement
                     temp += "unless score 1 p-numbers = 1 p-numbers"
             
-        cmpre(condition)
+        cmpre(condition, opp)
 
-        print('RESULT', temp)
         if add:
             return temp + "%end%"
         else:
             return temp.replace("execute run ", '')
         
     def parse_var(self, expression: ast.Attribute | ast.Name) -> tuple[str, str]:
-        if isinstance(expression, ast.Attribute):
+        """
+        Gets the entity and variable name of an ast obj
+        """
+        if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
+            if "." in expression.value:
+                entity, varName = expression.value.split('.', 1)
+                return self.get_entity(entity), varName
+            else:
+                return "#global", expression.value
+        elif isinstance(expression, ast.Attribute):
             if isinstance(expression.value, ast.Attribute):
                 a, b = self.parse_var(expression.value)
                 return a, b + "." + expression.attr
 
-            return self.get_entity(self.get_value(expression.value)), expression.attr
+            return self.parse_entity(expression.value), expression.attr
         elif isinstance(expression, ast.Name):
             return "#global", expression.id
+        else:
+            self.raise_error(None, "Variable cannot be parsed - it is not a valid type.", ast.unparse(expression), 4)
+        
+    def parse_var_only(self, expression: ast.Attribute | ast.Name) -> str:
+        """
+        Only get the name of the variable, not the entity.
+        """
+        if isinstance(expression, ast.Attribute):
+            if isinstance(expression.value, ast.Attribute):
+                a, b = self.parse_var(expression.value)
+                return a + '.' + b + "." + expression.attr
 
+            return self.get_value(expression.value) + '.' + expression.attr
+        elif isinstance(expression, ast.Name):
+            return expression.id
+        
     def write(self, filename: str, data: str):
-        filename = filename.replace("__", "/").lower()
+        """
+        Write the file to the memory.
+        Use the write_files to write the saved data into disk.
+        """
+
+        filename = filename.replace('__', "/").lower()
         if filename not in self.files:
             self.files[filename] = data
         else:
-            self.files[filename] += "\n" + data
+            if self.files[filename] == '':
+                self.files[filename] = data
+            else:
+                self.files[filename] += "\n" + data
 
     def print(self):
         for file in self.files:
             print(f"\nIN FILE {file}.mcfunction:\n" + self.files[file])
 
-    def aug_assign(self, expression: ast.Attribute | ast.Name):
+    def inverse_parse_var(self, var: str):
+        """
+        Inversely parses a var, or turns a String into an ast.Name or ast.Attribute.
+        Intended for reverse usage, such as the add/sub/.. functions.
+        """
+
+        if '.' in var:
+            splitted = var.split('.', )
+
+            a = splitted[-1]
+            v = '.'.join(splitted[:-1])
+
+            if '.' in v:
+                v = self.inverse_parse_var(v)
+            else:
+                v = ast.Name(id=v)
+
+            return ast.Attribute(value=v, attr=a)
+        else:
+            return ast.Name(id=var)
+
+    def aug_assign(self, expression: ast.AugAssign):
+        if isinstance(expression.value, ast.Constant) and isinstance(expression.value.value, str):
+            expression.value = self.inverse_parse_var(expression.value.value)
+
         if isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
             # Must be var, so
             var = expression.target
@@ -622,10 +811,16 @@ class KCF:
 
             value = self.get_int(expression.value)
 
+            # MC does not accept -1 adds/removes
+            opp = False
+            if value < 0 and type(expression.op) in (ast.Add, ast.Sub):
+                opp = True
+                value *= -1
+
             if isinstance(expression.op, ast.Add):
-                return (f"scoreboard players add {entity} {varName} {value}")
+                return (f"scoreboard players {'remove' if opp else 'add'} {entity} {varName} {value}")
             elif isinstance(expression.op, ast.Sub):
-                return (f"scoreboard players remove {entity} {varName} {value}")
+                return (f"scoreboard players {'add' if opp else 'remove'} {entity} {varName} {value}")
             else:
 
                 if isinstance(expression.op, ast.Mult) or isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
@@ -690,11 +885,11 @@ class KCF:
             
             return "\n".join(temp)
         else:
-            entity, varName = self.parse_var(expression.value)
+            entity1, varName1 = self.parse_var(expression.value)
             
             var = expression.target
 
-            entity1, varName1 = self.parse_var(var)
+            entity, varName = self.parse_var(var)
 
             if isinstance(expression.op, ast.Add):
                 return (f"scoreboard players operation {entity} {varName} += {entity1} {varName1}")
@@ -710,8 +905,13 @@ class KCF:
     def assign(self, expression: ast.Assign):
         # Constant
         temp = []
+        if isinstance(expression.value, ast.Dict):
+            for var in expression.targets:
+                value = self.parse_dict(expression.value)
+                temp.append(f"data modify storage kcf:vars {self.parse_var_only(var)} set value {value}")
 
-        if isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
+
+        elif isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
             # Must be var, so
             for var in expression.targets:
                 # If self, e.g.                    
@@ -720,12 +920,36 @@ class KCF:
                     self.labels[var.id[1:]] = self.get_int(expression.value)
 
                 else:
-                    entity, varName = self.parse_var(var)
+                    # If integer:
+                    
+                    value = expression.value.value
+                    
+                    if isinstance(value, int):
+                        entity, varName = self.parse_var(var)
 
-                    if varName not in self.variables:
                         self.variables[varName] = "dummy"
 
-                    temp.append(f"scoreboard players set {entity} {varName} {expression.value.value}")
+                        temp.append(f"scoreboard players set {entity} {varName} {value}")
+
+                    else:
+                        if type(value) in (str, dict, float, bool):
+                            var = self.parse_var_only(var)
+                            self.variables[var] = value
+
+                            # Parsed value
+                            if isinstance(value, str):
+                                parsedValue = f'"{value}"'
+                            elif isinstance(value, dict):
+                                parsedValue = self.parse_dict(value)
+                            elif isinstance(value, bool):
+                                parsedValue = '1b' if value else '0b'
+                            else:
+                                parsedValue = value
+
+                            temp.append(f"data modify storage kcf:vars {var} set value {parsedValue}")
+                        else:
+                            self.raise_error(None, f"Variable '{var}' is not a valid type! It is neither a scoreboard (int) or a storage (str, dict, float, bool)", ast.unparse(value), 2)
+                        
         elif isinstance(expression.value, ast.BinOp):
             # Convert to AugAssign statements
             statements, result_expr = convert_binop(expression.value, ".temp", self.tempi)
@@ -829,6 +1053,8 @@ class KCF:
         # Add one if to counter
         self.conditions += 1
 
+        fname = fname.replace('__', '/')
+
         # Expression 
         if isinstance(expression.orelse, ast.Call):
             condition = condition.replace("%end%", f"run function {self.namespace}:{fname}")
@@ -869,7 +1095,32 @@ class KCF:
             self.write(fname, condition + "\n" + self.parse(expression.orelse, fname))
 
             return (f"function {self.namespace}:{fname}")
+        
+    def parse_dict(self, data: ast.Dict):
+        values = []
+
+        for i in range(len(data.keys)):
+            k = data.keys[i]
+            v = data.values[i]
+
+            if isinstance(v, ast.Dict):
+                values.append(f"{k.value}: {self.parse_dict(v)}")
+            else:
+                values.append(f"{k.value}: {v.value}")
+
+        return '{' + ", ".join(values) + '}'
     
+    def parse_primative_dict(self, data: dict):
+        
+        # {'abc': 1, 'def': {'abc': 1}}
+        values = []
+
+        for k, v in data.items():
+            if isinstance(v, dict):
+                v = self.parse_dict(v)
+            values.append(f"{k}: {v}")
+
+        return '{' + ", ".join(values) + '}'
 
     def parse(self, parsed: list[ast.FunctionDef], filename = ""):
         cmds = []
@@ -898,7 +1149,7 @@ class KCF:
 
                     if len(expression.value.args) == 0:
                         funcname = expression.value.func.id.lower()
-                        funcname = funcname.replace("__", '/')
+                        funcname = funcname.replace('__', '/')
                         cmds.append(f"function {self.namespace}:{funcname}")
                     else:
                         args = expression.value.args
@@ -906,7 +1157,22 @@ class KCF:
 
                         match func:
                             case "run":
-                                cmds.append(args[0].value)
+                                # If F string
+                                if isinstance(args[0], ast.JoinedStr):
+                                    temp = ""
+                                    for v in args[0].values:
+                                        if isinstance(v, ast.Constant):
+                                            temp += v.value
+                                        elif isinstance(v, ast.FormattedValue):
+                                            temp += f"$({v.value.id})"
+
+                                    if not temp.startswith('$'):
+                                        temp = '$' + temp
+
+                                    cmds.append(temp)
+    
+                                else:
+                                    cmds.append(args[0].value)
                             case "var":
                                 if len(args) == 1:
                                     vartype = "dummy"
@@ -922,11 +1188,14 @@ class KCF:
                             case "label":
                                 self.labels[args[0].value] = args[1].value
                             case _:
-                                cmd = self.command(func, args, filename)
+                                cmd = self.command(func, args, filename, expression)
                                 cmds.append(cmd)
                 # IF
                 elif isinstance(expression.value, ast.IfExp):
                     cmds.append(self.ifexpr(expression.value, filename))
+                else:
+                    if not (isinstance(expression.value, ast.Constant) and isinstance(expression.value.value, str)):
+                        self.raise_warning(filename, f"Expression '{ast.unparse(expression)}' is skipped.", ast.unparse(expression))
             elif isinstance(expression, ast.If):
                 cmds.append(self.ifexpr(expression, filename))
             elif isinstance(expression, ast.While):
@@ -948,8 +1217,8 @@ class KCF:
 
                 temp = temp.replace("%end%", f"run function {self.namespace}:{fname}")
 
-                self.write(fname, self.parse(expression.body, fname) + "\n" + temp)
-                
+                self.write(fname, self.parse(expression.body, fname) +"\n" + temp)
+                 
                 # Add 1 to the condition counter
                 self.conditions += 1
             elif isinstance(expression, ast.For):
@@ -982,9 +1251,111 @@ class KCF:
                     self.write(fname, self.parse(expression.body, fname) +f"\nscoreboard players add #global {var} {step}\nexecute if score #global {var} matches ..{end - 1} run function {self.namespace}:{fname}")
                     
                     self.conditions += 1
-        return "\n".join(cmds)
-  
+            else:
+                if not (isinstance(expression, ast.ImportFrom) and expression.module == 'KCFSyntax') and not isinstance(expression, ast.Pass):
+                    self.raise_warning(filename, f"Expression '{ast.unparse(expression)}' is skipped.", ast.unparse(expression))
+                if isinstance(expression, ast.Pass):
+                    cmds.append('\0')
+        try:
+            return "\n".join(cmds)
+        except TypeError:
+            # Search through
+            i = cmds.index(None)
+            kw = ast.unparse(parsed[i])
+
+            self.raise_error(filename, "[parse] Cannot parse expression.", kw, 2)
+
+
+    def raise_error(self, filename: str, message: str, keywords: str = None, error_level: int = 3):
+        """
+        Raises an error to the user.
+        Filename and keywords could be NONE.
+
+        Error level specifies the level of error occurred.
+        1. Not extreme but may cause some issues and should be avoided
+        2. May break code and should be avoided
+        3. Will break code
+        4. Will break code definitely
+        5. Extreme disallowed.
+
+        Therefore if the ERROR_THRESHOLD is set to 5+, all custom errors are ignored
+        """
+
+    
+        
+        ErrorMessage = self.raise_message(filename, message, keywords)  
+
+        if error_level < self.ERROR_THRESHOLD:
+            self.warn(ErrorMessage)
+        else:
+            raise TypeError(ErrorMessage)
+    
+    def raise_warning(self, filename: str, message: str, keywords: str = None):
+        """
+        Adds a warning to the user but will not stop the code
+        """
+
+        ErrorMessage = self.raise_message(filename, message, keywords)
+
+        if self.ERROR_THRESHOLD <= 0:
+            raise TypeError(ErrorMessage)
+        else:
+            self.warn(ErrorMessage)
+
+    def raise_message(self, filename: str, message: str, keywords: str = None):
+        try:
+            if keywords is not None:
+                # Keyword may be list, in that case
+                if type(keywords) == str:
+                    keywords = [keywords]
+
+
+                # Find line
+                lines = self.code.splitlines()
+
+                lastFunc = ".;'\."
+                b = False
+                for i in range(len(lines)):
+                    for kw in keywords:
+                        kw = str(kw)
+                        if (kw in lines[i]) and (filename is None or filename == '?' or filename.lower().startswith(lastFunc.lower())):
+                            ln = i + 1
+                            line = lines[i].strip()
+                            b = True                
+                        
+                    if lines[i].startswith("def "):
+                        lastFunc = lines[i][4:].split('(')[0]
+                    if b:
+                        break
+                else:
+                    ln = '?'
+                    line = '?'
+
+                # If ?
+                if filename == '?' or filename is None:
+                    filename = lastFunc
+
+                # Create nice ^^^
+                ind = line.index(str(keywords[0]))
+                locText = (' ' * ind) + ('^' * len(str(keywords[0])))
+
+                msg = f"{message}\n  Detected to occur at line {ln} position {ind+1}, in function '{filename}':\n    {line}\n    {locText}"
+            else:
+                msg = message
+        except Exception as e:
+            msg = message
+
+        return msg
+
     def add_extras(self):
+        # REMOVE \0
+        for file in self.files:
+            lines = []
+            for line in self.files[file].splitlines():
+                if '\0' not in line:
+                    lines.append(line)
+            self.files[file] = '\n'.join(lines)
+
         # ADD VARIABLES
         for var, t in self.variables.items():
             if t == 'dummy' and var != '.temp':
@@ -1020,8 +1391,18 @@ class KCF:
         
 
     def build(self):
-        self.parse(self.code)
+        codeTree = ast.parse(self.code).body
+        self.parse(codeTree)
         self.add_extras()
+
+    def print_warnings(self):
+        if len(self.warnings) > 0:
+            print("== WARNINGS ==")
+            for i in range(len(self.warnings)):
+                warning = self.warnings[i]
+
+                print(f"{i+1}. {warning}")
+
 
     def write_files(self, destination: str = "."):
         for file, contents in self.files.items():
