@@ -251,6 +251,24 @@ def onnewjoin():
                 this.disabled = false;
             }
         });
+
+        // Load previous code saved from local storage
+        let previousCode = localStorage.getItem("code");
+
+        if (previousCode !== null) {
+            console.log("Local storage found! Loading code...");
+
+            editor.session.setValue(previousCode);
+        }
+        
+        // Save code to local storage
+        editor.on("beforeEndOperation", function(e) {
+            if (editor.curOp.docChanged && editor.curOp.command.name == "insertstring") {
+                const pythonCode = editor.getValue();
+
+                localStorage.setItem("code", pythonCode);
+            }
+        });
     </script>
 </body>
 </html>

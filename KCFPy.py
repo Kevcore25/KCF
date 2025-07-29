@@ -1324,7 +1324,7 @@ class KCF:
                 # Find line
                 lines = self.code.splitlines()
 
-                lastFunc = ".;'\."
+                lastFunc = ".;'\\."
                 b = False
                 for i in range(len(lines)):
                     for kw in keywords:
