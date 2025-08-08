@@ -36,7 +36,7 @@ error_threshold = configs['Error Threshold']
 
 # Get Code
 print("Getting code...")
-with open(source, 'r') as f:
+with open(source, 'r', encoding='utf-8') as f:
     code = f.read()
 
 print("Initializing KCF...")
@@ -90,7 +90,22 @@ mkdir(join(name, "data", namespace, "function"))
 mkdir(join(name, "data", "minecraft"))
 mkdir(join(name, "data", "minecraft", "tags"))
 mkdir(join(name, "data", "minecraft", "tags", "function"))
+mkdir(join(name, "data", "minecraft", "tags", "damage_type"))
 
+mkfile(join(name, "data", "minecraft", "tags", "damage_type", "bypasses_cooldown.json"), json.dumps({
+    "values": [
+            "minecraft:mob_attack",
+            "minecraft:magic",
+            "minecraft:indirect_magic",
+            "minecraft:arrow",
+            "minecraft:outside_border",
+            "minecraft:out_of_world",
+            "minecraft:explosion",
+            "minecraft:dragon_breath",
+            "minecraft:mob_projectile",
+            "minecraft:player_attack"
+    ]
+}))
 mkfile(join(name, "data", "minecraft", "tags", "function", "load.json"), json.dumps({
     "values": [
         f"{namespace}:load"
@@ -114,4 +129,5 @@ t.write_files(dest)
 # print("Done!")
 # input("Press enter to continue...\t")
 t.print()
+t.print_stats()
 t.print_warnings()

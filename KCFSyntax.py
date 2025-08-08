@@ -8,6 +8,7 @@ It specifies valid functions to use and its arguments.
 """
 
 from ids import *
+from typing import *
 
 entity = lambda Entity: "Entity condition for conditional statements"
 block = lambda Position, Block: "Block condition for conditional statements"
@@ -208,14 +209,14 @@ def resetattribute(Entity: SelectorEntity, Attribute: str):
 
 #     **create**: Create a new bossbar.
 #     Args: `id: str`, `name: str`
-    
+
 #     **get**: Get a bossbar attribute
 #     Args: `id: str`, `option: str`.
 #     * option: Can be of: max, players, value, visible
 
 #     **remove**: Remove a bossbar.
 #     Args: `id: str`
-    
+
 
 #     **set**
 #     """
@@ -400,6 +401,16 @@ def gamemode(Players: Player, Gamemode: Gamemode):
     Example: `gamemode(self, creative)`
     """
 
+def set(Variable: str, Value: int):
+    """
+    Set a value to a variable.
+    It is equivalent to var = value.
+
+    It is mostly used in a non-expression cases.
+
+    Example: `execute('as @a', set('self.var1', 1))`
+    """
+
 def add(Variable: str, Value: int):
     """
     Adds a value to a variable.
@@ -454,9 +465,48 @@ def mult(Variable: str, Value: int):
     Example: `execute('as @a', mult('self.var1', 2))`
     """
 
+
 def div(Variable: str, Value: int):
     """
     Alias to divide.
     
     Example: `execute('as @a', div('var1', 2))`
+    """
+
+class Expression: "An expression but NOT a complex one"
+
+
+def store(Variable: str, Expression: Expression):
+    """
+    Stores the result of a command to a variable.
+    
+    Example: `store(self.damage, getdata(self, 'SelectedItem.components."minecraft:custom_data".Damage'))`
+    """
+
+
+def getdata(Entity: SelectorEntity, Data: str, Scale: float = 1):
+    """
+    Gets the data of an entity
+    
+    Example: `store(self.damage, getdata(self, 'SelectedItem.components."minecraft:custom_data".Damage'))`
+    """
+
+def setdata(Entity: SelectorEntity, Data: str, Value: Any):
+    """
+    Sets the data of an entity
+    
+    Example: `setdata(self, 'Health', 10)`
+    """
+
+def tp(Entity: SelectorEntity, Position: str):
+    """
+    Teleports the entity to a position
+
+    Example: `tp(self, '~ ~1 ~')`
+    """
+def teleport(Entity: SelectorEntity, Position: str):
+    """
+    Alias to TP function
+
+    Example: `teleport(self, '~ ~1 ~')`
     """

@@ -7,6 +7,15 @@ A minor version (V.2.1 > V.2.2) is determined if it only adds minor changes or f
 
 Bolded features are key highlights of a version.
 
+## V.4.1: Return statement
+* **Added return statement** although it is very buggy due to how the program works.
+    * The return statement returns only a integer value
+    * The return statement cannot be inside of another statement, such as an if statement
+        * However, a singluar if statement (e.g. if a == 3: return 1) will work
+        * I will work on fixing this issue in future versions
+* Fixed BinOp (compound variable operations) issues
+* Added a few commands
+
 ## V.4.0: User-friendly Update!
 * Fixed AugAssign assigning wrong vars
 * **Added a bunch of MC commands**
@@ -36,16 +45,15 @@ def damageself(damage):
     run(f'damage @s {damage}')
 
 def myfunction():
+    # NOTICE: You MUST use a variable as an argument, not a constant
     item = "diamond_sword"
     title = "Blue Sword"
 
     givesword(item)
 
     if not tag('nodamage'):
-        # NOTICE: You MUST use a variable as an argument, not a constant
-        # For example, damageself(4.0) will not work
-        damage = 4.0
-        damageself(damage)
+        # You can, however, use 1 singular argument as a DICT for constants
+        damageself({'damage': 4.0})
 ```
 
 ## V.3.0: New f-string system!

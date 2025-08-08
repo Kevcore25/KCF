@@ -1,16 +1,9 @@
 import ast, json, os, re
 
 # Version stuff
-VERSION = 4.0
+VERSION = 5.0
 VERSION_HIGHLIGHTS = """
-4.0 Changes:
-* Improved error-handling
-* Warning / Error messages
-* More MC functions
-* Function macros (Custom functions accept arguments)
-* Non-int variables for macros
-* Dictionary acceptance instead of string
-* "not" operation for conditionals (if not entity(self))
+NOTE: This is a development version of 5.0!
 """
 
 # Turn debug mode on or off
@@ -190,20 +183,34 @@ def convert_binop(binop_node, temp_name, tempi = 0):
     temp_load = ast.Attribute(value=ast.Name(id=f'.t{tempi}', ctx=ast.Load()), attr=temp_name, ctx=ast.Load())
 
     # Generate statements
-    statements = [
-        ast.Assign(targets=[temp_store], value=operands[0])
-    ]
+    statements = []
     
+    # Process 1st op (might be a nested BinOp)
+    if isinstance(operands[0], ast.BinOp):
+        nested_statements, nested_result = convert_binop(operands[0], temp_name, tempi + 1)
+        statements += nested_statements
+        statements.append(ast.Assign(targets=[temp_store], value=nested_result))
+    else:
+        statements.append(ast.Assign(targets=[temp_store], value=operands[0]))
+    
+    # Process remaining ops
     for operand in operands[1:]:
-        if isinstance(operand, ast.Constant):
+        if isinstance(operand, ast.BinOp):
+            # Recursively process nested BinOp
+            nested_statements, nested_result = convert_binop(operand, temp_name, tempi + 1)
+            statements += nested_statements
             statements.append(
-                ast.AugAssign(target=temp_store, op=binop_node.op, value=operand)
+                ast.AugAssign(target=temp_store, op=binop_node.op, value=nested_result)
             )
         else:
             statements.append(
-                ast.AugAssign(target=operand, op=binop_node.op, value=temp_store)
+                ast.AugAssign(target=temp_store, op=binop_node.op, value=operand)
             )
-        
+
+    if debug:
+        for i in statements:
+            print('binop', ast.dump(i))
+
     return statements, temp_load
 
 
@@ -252,7 +259,7 @@ class KCF:
         """
         Get an int OR float value within bounds.
         """
-        if isinstance(value.value, int):
+        if isinstance(value, ast.UnaryOp) or isinstance(value.value, int):
             num = self.get_int(value)
         elif isinstance(value.value, float):
             num = value.value
@@ -269,7 +276,49 @@ class KCF:
 
         return num
 
+    def parse_list(self, value: ast.List) -> str:
+        """
+        Parses a list and returns it as a String representation
+        """
+        result = []
+
+        for v in value.elts:
+            result.append(str(self.get_abs_value(v)))
+        
+        # Could just use ', ' for cleaner look?
+        return '[' + ','.join(result) + ']'
+
+    def get_abs_value(self, value: ast.Constant | ast.Name | ast.Attribute | ast.List | ast.Dict):
+        """
+        Returns a representation of a valid MC value.
+        The difference between this and get_value is that it accepts more than just String and variables.
+
+        Currently supports all constants (String/float/int), dict.
+        Dict and list are returned as String.
+        """
+
+        if debug:
+            print('val', ast.dump(value))
+
+        # Return constant
+        if isinstance(value, ast.Constant):
+            return value.value
+        # Return just the get_value if possible
+        elif isinstance(value, ast.Name) or isinstance(value, ast.Attribute):
+            return self.get_value(value)
+        # Dict
+        elif isinstance(value, ast.Dict):
+            return self.parse_dict(value)
+        elif isinstance(value, ast.List):
+            return self.parse_list(value)
+
+        self.raise_error(None, "Unable to parse the type of the value", ast.unparse(value))
+
     def get_value(self, value, allowNonStr: bool = False) -> str:
+        """
+        Gets the value of a string-like value.
+        Can be a String or a variable.
+        """
         if isinstance(value, ast.Name):
             if value.id.startswith("_"):
                 try:
@@ -566,27 +615,49 @@ class KCF:
                     value = args[1]
                 ))
 
+            case "set":
+                return self.assign(ast.Assign(
+                    targets = [args[0]],
+                    value = args[1]
+                ))
+
+            case "store":
+                entity, varName = self.parse_var(args[0])
+                return f"execute store result score {entity} {varName} run {self.get_func(args[1], filename)}"
+
+            case "getdata":
+                if len(args) == 2:
+                    return f"data get entity {self.parse_entity(args[0])} {self.get_value(args[1])}"
+                elif len(args) == 3:
+                    return f"data get entity {self.parse_entity(args[0])} {self.get_value(args[1])} {self.get_lim_num(args[2])}"
+                
+            case "setdata":
+                return f"data modify entity {self.parse_entity(args[0])} {self.get_value(args[1])} {self.get_abs_value(args[2])}"
 
             case _:
                 # Call custom function. Args must be of NAME value
                 result = []
-                for arg in args:
-                    val = self.parse_var_only(arg)                       
-                    if val in self.variables:
-                        if isinstance(self.variables[val], str) and self.variables[val] == 'dummy':
+                if len(args) == 1 and isinstance(args[0], ast.Dict):
+                    result.append(f'function {self.namespace}:{cmd.lower()} {self.parse_dict(args[0])}')
+
+                else:
+                    for arg in args:
+                        val = self.parse_var_only(arg)                       
+                        if val in self.variables:
+                            if isinstance(self.variables[val], str) and self.variables[val] == 'dummy':
+                                entity, varName = self.parse_var(arg)
+                                result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
+                            else:
+                                result.append(f"data modify storage kcf:functionargs {val} set from storage kcf:vars {val}")
+
+                        elif isinstance(arg, ast.Constant):
+                            self.raise_error(filename, "Argument cannot be a pre-defined value. It must be a variable, or be set to a single DICT type", [arg.value, cmd], 2)
+
+                        else:
                             entity, varName = self.parse_var(arg)
                             result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
-                        else:
-                            result.append(f"data modify storage kcf:functionargs {val} set from storage kcf:vars {val}")
 
-                    elif isinstance(arg, ast.Constant):
-                        self.raise_error(filename, "Argument cannot be a pre-defined value. It must be a variable.", [arg.value, cmd], 2)
-
-                    else:
-                        entity, varName = self.parse_var(arg)
-                        result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
-
-                result.append(f'function {self.namespace}:{cmd.lower()} with {self.namespace}:functionargs')
+                    result.append(f'function {self.namespace}:{cmd.lower()} with storage {self.namespace}:functionargs')
 
                 return "\n".join(result)
 
@@ -743,20 +814,25 @@ class KCF:
         if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
             if "." in expression.value:
                 entity, varName = expression.value.split('.', 1)
-                return self.get_entity(entity), varName
+                a, b = self.get_entity(entity), varName
             else:
-                return "#global", expression.value
+                a, b = "#global", expression.value
         elif isinstance(expression, ast.Attribute):
             if isinstance(expression.value, ast.Attribute):
-                a, b = self.parse_var(expression.value)
-                return a, b + "." + expression.attr
-
-            return self.parse_entity(expression.value), expression.attr
+                d, e = self.parse_var(expression.value)
+                a, b = d, e + "." + expression.attr
+            else:
+                a, b = self.parse_entity(expression.value), expression.attr
         elif isinstance(expression, ast.Name):
-            return "#global", expression.id
+            a, b = "#global", expression.id
         else:
             self.raise_error(None, "Variable cannot be parsed - it is not a valid type.", ast.unparse(expression), 4)
         
+        if b not in self.variables:
+            self.variables[b] = 'dummy'
+
+        return a, b
+
     def parse_var_only(self, expression: ast.Attribute | ast.Name) -> str:
         """
         Only get the name of the variable, not the entity.
@@ -820,7 +896,7 @@ class KCF:
             # If self, e.g.
             entity, varName = self.parse_var(var)
 
-            value = self.get_int(expression.value)
+            value = self.get_int(expression.value, allowNonInt=True)
 
             # MC does not accept -1 adds/removes
             opp = False
@@ -837,7 +913,7 @@ class KCF:
                 if isinstance(expression.op, ast.Mult) or isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
                     # For decimals, use 2 commands to essnetially give a best rounded answer.
                     if isinstance(value, float):
-                        value = expression.value.value
+                        value = self.get_int(expression.value, allowNonInt=True)
 
                         # Num of digits after .
                         digits = len(str(value).split('.')[1])
@@ -877,9 +953,9 @@ class KCF:
 
             # Create final assignment
             final_assignment = ast.AugAssign(
-                target=result_expr,
+                target=expression.target,
                 op=expression.op,
-                value=expression.target
+                value=result_expr
             )
 
             # Combine all statements
@@ -918,9 +994,11 @@ class KCF:
         temp = []
         if isinstance(expression.value, ast.Dict):
             for var in expression.targets:
-                value = self.parse_dict(expression.value)
-                temp.append(f"data modify storage kcf:vars {self.parse_var_only(var)} set value {value}")
+                temp.append(f"data modify storage kcf:vars {self.parse_var_only(var)} set value {self.parse_dict(expression.value)}")
 
+        elif isinstance(expression.value, ast.List):
+            for var in expression.targets:
+                temp.append(f"data modify storage kcf:vars {self.parse_var_only(var)} set value {self.parse_list(expression.value)}")
 
         elif isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
             # Must be var, so
@@ -932,26 +1010,24 @@ class KCF:
 
                 else:
                     # If integer:
-                    
-                    value = expression.value.value
+                    value = self.get_int(expression.value, allowNonInt=True)
                     
                     if isinstance(value, int):
                         entity, varName = self.parse_var(var)
 
-                        self.variables[varName] = "dummy"
+                        if varName not in self.variables:
+                            self.variables[varName] = "dummy"
 
                         temp.append(f"scoreboard players set {entity} {varName} {value}")
 
                     else:
-                        if type(value) in (str, dict, float, bool):
+                        if type(value) in (str, float, bool, list):
                             var = self.parse_var_only(var)
                             self.variables[var] = value
 
                             # Parsed value
                             if isinstance(value, str):
                                 parsedValue = f'"{value}"'
-                            elif isinstance(value, dict):
-                                parsedValue = self.parse_dict(value)
                             elif isinstance(value, bool):
                                 parsedValue = '1b' if value else '0b'
                             else:
@@ -988,7 +1064,8 @@ class KCF:
             for var in expression.targets:
                 entity1, varName1 = self.parse_var(var)
                 # Add to vars
-                self.variables[varName1] = "dummy"
+                if varName1 not in self.variables:
+                    self.variables[varName1] = "dummy"
 
                 temp.append(f"scoreboard players operation {entity1} {varName1} = {entity2} {varName2}")
 
@@ -1239,29 +1316,54 @@ class KCF:
                 var = expression.target.id
 
                 # Add to global vars
-                self.variables[var] = "dummy"
+                if var not in self.variables:
+                    self.variables[var] = "dummy"
 
                 # Get the range
                 if isinstance(expression.iter, ast.Call) and expression.iter.func.id == "range":
                     args = expression.iter.args
 
-                    step = 1
-                    start = 0
+                    def get(arg: ast.Constant | ast.Name | ast.Attribute):
+                        if isinstance(arg, ast.Constant):
+                            value = arg.value
+                            if value not in self.pNumbers:
+                                self.pNumbers.append(value)
+                            
+                            return f"{value} p-numbers"
+                        else:
+                            return ' '.join(self.parse_var(arg))
+                        
+                    # Create a constant so the get function would work
+                    # Get function auto inits pNumbers
+                    step = get(ast.Constant(value=1))
+                    start = get(ast.Constant(value=0))
+
                     if len(args) == 1:
-                        end = args[0].value
+                        end = get(args[0])
                     elif len(args) == 2:
-                        start = args[0].value
-                        end = args[1].value
+                        start = get(args[0])
+                        end = get(args[1])
                     elif len(args) == 3:
-                        start = args[0].value
-                        end = args[1].value
-                        step = args[2].value
+                        start = get(args[0])
+                        end = get(args[1])
+                        step = get(args[2])
 
-                    cmds.append(f"scoreboard players set #global {var} {start}\nfunction {self.namespace}:{fname}")
+                    cmds.append(f"scoreboard players operation #global {var} = {start}\nfunction {self.namespace}:{fname}")
 
-                    self.write(fname, self.parse(expression.body, fname) +f"\nscoreboard players add #global {var} {step}\nexecute if score #global {var} matches ..{end - 1} run function {self.namespace}:{fname}")
+                    self.write(fname, self.parse(expression.body, fname) +f"\nscoreboard players operation #global {var} += {step}\nexecute if score #global {var} < {end} run function {self.namespace}:{fname}")
                     
                     self.conditions += 1
+
+            elif isinstance(expression, ast.Return):
+                # if isinstance(expression.value)
+                try:
+                    if isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
+                        cmds.append(f"return {self.get_int(expression.value)}")
+                    else:
+                        cmds.append(f"return run {self.get_func(expression.value)}")
+
+                except AttributeError:
+                    cmds.append(f"return fail")
             else:
                 if not (isinstance(expression, ast.ImportFrom) and expression.module == 'KCFSyntax') and not isinstance(expression, ast.Pass):
                     self.raise_warning(filename, f"Expression '{ast.unparse(expression)}' is skipped.", ast.unparse(expression))
@@ -1414,11 +1516,25 @@ class KCF:
 
                 print(f"{i+1}. {warning}")
 
+    def print_stats(self):
+        """Prints stats like how much lines are saved and etc."""
+        print("== STATISTICS ==")
+        totalChar = 0
+        lns = 0
+        for file in self.files:
+            totalChar += len(self.files[file].replace("\n\n","\n"))
+            lns += self.files[file].replace("\n\n","\n").count('\n')
+
+        nowchar = len(self.code.replace("\n\n","\n"))
+        nowlns = self.code.replace("\n\n","\n").count('\n')
+
+        print(f"Characters Saved: {totalChar - nowchar} ({nowchar} chars in code compared to {totalChar} chars in MCF)")
+        print(f"Lines Saved: {lns - nowlns} ({nowlns} lines in code compared to {lns} lines in MCF)")
 
     def write_files(self, destination: str = "."):
         for file, contents in self.files.items():
             files = file.split('/')
             if not os.path.isdir(os.path.join(destination, *files[:-1])):
                 os.mkdir(os.path.join(destination, *files[:-1]))
-            with open(os.path.join(destination, *files[:-1], files[-1] + ".mcfunction"), 'w') as f:
+            with open(os.path.join(destination, *files[:-1], files[-1] + ".mcfunction"), 'w', encoding='utf-8') as f:
                 f.write(contents)

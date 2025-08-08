@@ -56,8 +56,7 @@ def nostamina():
     effect(self, weakness, 1, 2)
     effect(self, mining_fatigue, 1, 2)
 
-    # As of previous versions, the attribute function does not exist.
-    # This also shows that you can still use MC commands within KCF-Py
+    # Set the base attributes
     attribute(self, jump_strength, 0)
     attribute(self, attack_damage, -1000)
     attribute(self, block_interaction_range, 0)
@@ -88,6 +87,7 @@ def tick():
                 regenstamina()
             displaystamina()
         
+        # Remove stamina on actions
         if self.sprinting > 0:
             self.stamina -= 25
             self.staminaCD = StaminaRegenCD
@@ -101,6 +101,7 @@ def tick():
             self.staminaCD = StaminaRegenCD
             self.attacking = 0
 
+        # Stamina cannot be negative
         if self.stamina < 0:
             self.stamina = 0
 
@@ -110,5 +111,5 @@ def tick():
             hasstamina()
 
     # Run a function as everyone
-    # The "execute("as @a", executeall)" is so mandatory for many projects that in the future, a built-in function may exist just for it!
+    # Alternatively, you can add commands to the onfuncs function which will automatically be executed as all players
     execute("as @a", executeall)
