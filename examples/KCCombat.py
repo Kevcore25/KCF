@@ -278,6 +278,18 @@ def tick10():
     schedule('10t', tick10)
     execute('as @e at @s', elementEffects10t)
 
+def endermanEffects():
+    # Enderman ice status
+    self.ice = 20
+    self.iceS = 1
+
+    # Enderman Magnetic effect
+    execute('as @a[distance=..2.5]', set(self.takedmg, 5))
+    execute('as @a[distance=..2.5]', mult(self.takedmg, self.takeem))
+    execute('as @a[distance=..2.5]', set(self.iceS, 1))
+    execute('as @a[distance=..2.5]', doElectricDMG)
+
+
 def sec():
     schedule('1s', sec)
 
@@ -286,10 +298,11 @@ def sec():
     execute('as @e at @s', elementEffects)
 
     # Enderman ice status
-    execute('as @e[type=enderman]', set('self.ice', 20))
-    execute('as @e[type=enderman]', set('self.iceS', 1))
+    execute('as @e[type=enderman] at @s', endermanEffects)
     execute('as @e[type=stray]', set('self.ice', 20))
     execute('as @e[type=stray]', set('self.iceS', 1))
+
+
 
 def rollFire():
     store(self.rolltemp, getdata(self, 'SelectedItem.components."minecraft:custom_data".Fire'))    
@@ -952,7 +965,6 @@ def genericEntityTick():
             self.electricS -= 1; self.fireS -= 1
 
 
-
     if self.iceS > 0 and self.electricS > 0:
         # MAGENTIZE
         self.magnetized += 80 
@@ -1070,9 +1082,15 @@ def genericEntityTick():
     if self.health > self.max_health:
         self.health = self.max_health
 
+    if entity('@s[type=evoker_fangs,nbt={Warmup:-9}]'):
+        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', set(self.takedmg, 50))
+        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', set(self.electricS, 1))
+        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', multiply(self.takedmg, self.takeem))
+        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', doNatureDMG)
 
 def onnewentity():
     tag(self, 'done')
+    tag(self, 'mob')
     if entity('@s[type = zombie]'):
         self.max_health = 1200
         self.defense = 850
@@ -1113,6 +1131,8 @@ def onnewentity():
         self.defense = 200
         self.max_shields = 1200
     else:
+        removetag(self, 'mob')
+
         store(self.max_health, run('attribute @s max_health get 25'))
         store(self.max_shields, run('attribute @s max_health get 25'))
 
