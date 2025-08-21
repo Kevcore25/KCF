@@ -39,7 +39,7 @@ def load():
     tick10()
 
 def giveweapon(Item, Name, Description, DMG, CR, CD, ATKSPD, Status, Fire, Ice, Water, Electric, Nature):
-    run(f'give @s {Item}[custom_name=[{{"text":"{Name}","italic":false}}],lore=[[{{"text":"{Description}","italic":false,"color":"gray"}}],"",[{{"text":"Base DMG: {DMG}","italic":false,"color":"gray"}}],[{{"text":"Base Status: {Status}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Chance: {CR}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Damage: {CD}%","italic":false,"color":"gray"}}],[{{"text":"Base Attack Speed: {ATKSPD}/s","italic":false,"color":"gray"}}]],custom_data={{DMG: {DMG}, CR: {CR}, CD: {CD}, ATKSPD: {ATKSPD}, Status: {Status}, Fire: {Fire}, Ice: {Ice}, Water: {Water}, Electric: {Electric}, Nature: {Nature}}},attribute_modifiers=[{{type:attack_damage,amount:-0.9,slot:mainhand,id:"251",operation:add_value}},{{type:attack_speed,amount:-4,slot:mainhand,id:"252",operation:add_value}},{{type:attack_speed,amount:{ATKSPD},slot:mainhand,id:"253",operation:add_value}}]]')
+    run(f'give @s {Item}[custom_name=\'[{{"text":"{Name}","italic":false}}]\',lore=[\'[{{"text":"{Description}","italic":false,"color":"gray"}}]\',\'[{{"text":"Base DMG: {DMG}","italic":false,"color":"gray"}}]\',\'[{{"text":"Base Status: {Status}%","italic":false,"color":"gray"}}]\',\'[{{"text":"Base Critical Chance: {CR}%","italic":false,"color":"gray"}}]\',\'[{{"text":"Base Critical Damage: {CD}%","italic":false,"color":"gray"}}]\',\'[{{"text":"Base Attack Speed: {ATKSPD}/s","italic":false,"color":"gray"}}]\'],custom_data={{DMG: {DMG}, CR: {CR}, CD: {CD}, ATKSPD: {ATKSPD}, Status: {Status}, Fire: {Fire}, Ice: {Ice}, Water: {Water}, Electric: {Electric}, Nature: {Nature}}},attribute_modifiers=[{{type:generic.attack_damage,amount:-0.9,slot:mainhand,id:"251",operation:add_value}},{{type:generic.attack_speed,amount:-4,slot:mainhand,id:"252",operation:add_value}},{{type:generic.attack_speed,amount:{ATKSPD},slot:mainhand,id:"253",operation:add_value}}]]')
 
 def everyelemsword():
     giveweapon({
@@ -152,7 +152,7 @@ def givebasic():
 
 
 def displayreactionm(Name: str, Color: str, x: float, y: float, z: float):
-    run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[1.2f,1.2f,1.2f]}}, billboard:"center",see_through:1b,text:{{"color":"{Color}","text":"{Name}","bold":true}},background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
+    run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[1.2f,1.2f,1.2f]}}, billboard:"center",see_through:1b,text:\'{{"color":"{Color}","text":"{Name}","bold":true}}\',background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
 
 def displayreaction(Name: str, Color: str):
     run(f'data modify storage kcf:functionargs Name set value "{Name}"')
@@ -198,9 +198,9 @@ execute store result storage kcf:functionargs z float 0.1 run random value -6..6
     
 
 def displaydmgM(Symbol: str, takedmg: int, Color: str, x: float, y: float, z: float):
-    run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,notDone,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[0.5f,0.5f,0.5f]}}, billboard:"center",see_through:1b,text:{{"color":"{Color}","text":"{Symbol} {takedmg}","bold":false}},background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
+    run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,notDone,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[0.5f,0.5f,0.5f]}}, billboard:"center",see_through:1b,text:\'{{"color":"{Color}","text":"{Symbol} {takedmg}","bold":false}}\',background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
 def displaydmgMD(Symbol: str, dec: int, whole: int, Color: str, x: float, y: float, z: float, compactLetter: str):
-    run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,notDone,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[0.5f,0.5f,0.5f]}}, billboard:"center",see_through:1b,text:{{"color":"{Color}","text":"{Symbol} {whole}.{dec}{compactLetter}","bold":false}},background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
+    run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,notDone,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[0.5f,0.5f,0.5f]}}, billboard:"center",see_through:1b,text:\'{{"color":"{Color}","text":"{Symbol} {whole}.{dec}{compactLetter}","bold":false}}\',background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
 
 
 def elementEffects():
@@ -784,9 +784,9 @@ def calcPlayerWeaponDamage():
 
 
 def displayname(healthpct: int, shieldpct: int, healthcolor: int):
-    run(f'data modify entity @s CustomName set value [{{"color":"{healthcolor}","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"blue","text":"⛊{shieldpct}%"}}]')
+    run(f'data modify entity @s CustomName set value \'[{{"color":"{healthcolor}","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"blue","text":"⛊{shieldpct}%"}}]\'')
 def dninv(healthpct: int, shieldpct: int):
-    run(f'data modify entity @s CustomName set value [{{"color":"dark_gray","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"dark_gray","text":"⛊{shieldpct}%"}}]')
+    run(f'data modify entity @s CustomName set value \'[{{"color":"dark_gray","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"dark_gray","text":"⛊{shieldpct}%"}}]\'')
 
 def applyElectrified():
     self.electrified += 4
@@ -895,7 +895,7 @@ def genericEntityTick():
             if self.waterS > 0:
                 self.water = 10
 
-        run('particle minecraft:block_crumble{block_state:"water"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
+        run('particle minecraft:block{block_state:"water"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
     if self.electric > 0:
         self.electric -= 1
         if self.electric <= 0:             
@@ -911,7 +911,7 @@ def genericEntityTick():
             if self.natureS > 0:
                 self.nature = 10
 
-        run('particle minecraft:block_crumble{block_state:"oak_leaves"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
+        run('particle minecraft:block{block_state:"oak_leaves"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
 
 
     # Reactions, in order
@@ -1081,7 +1081,7 @@ def genericEntityTick():
                     run('tp @s ~ ~-0.2 ~')
 
         # Particles
-        run('particle minecraft:block_crumble{block_state:"packed_ice"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
+        run('particle minecraft:block{block_state:"packed_ice"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
 
         self.frozen -= 1
 
@@ -1124,7 +1124,7 @@ def onnewentity():
         self.max_health = 2000
         self.defense = 200
         self.max_shields = 1000
-        attribute(self, scale, 1.25)
+        attribute(self, "generic.scale", 1.25)
     elif entity('@s[type = iron_golem]'):
         self.max_health = 2000
         self.defense = 2000
@@ -1133,7 +1133,7 @@ def onnewentity():
         self.max_health = 50
         self.defense = 0
         self.max_shields = 100
-        attribute(self, scale, 0.25)
+        attribute(self, "generic.scale", 0.25)
         if entity('@s[tag=!child]'):
             for i in range(4):
                 summon(spider, '~ ~ ~', {'Tags': '[child]'})
@@ -1153,27 +1153,27 @@ def onnewentity():
     else:
         removetag(self, 'mob')
 
-        store(self.max_health, run('attribute @s max_health get 25'))
-        store(self.max_shields, run('attribute @s max_health get 25'))
+        store(self.max_health, run('attribute @s generic.max_health get 25'))
+        store(self.max_shields, run('attribute @s generic.max_health get 25'))
 
-        store(self.temp, run('attribute @s attack_damage get 25'))
+        store(self.temp, run('attribute @s generic.attack_damage get 25'))
         self.max_shields += self.temp
 
 
-        store(self.defense, run('attribute @s armor get 50'))
+        store(self.defense, run('attribute @s generic.armor get 50'))
         self.defense += 200
 
-    store(self.em, run('attribute @s attack_damage get'))
+    store(self.em, run('attribute @s generic.attack_damage get'))
     self.takeem = 5
 
     # HP
-    attribute(self, max_health, 1024)
+    attribute(self, "generic.max_health", 1024)
     run('data modify entity @s Health set value 1024')
     self.health = self.max_health
     self.shields = self.max_shields
 
     # No KB
-    attribute(self, knockback_resistance, 0.9)
+    attribute(self, "generic.knockback_resistance", 0.9)
 
 
     run('data modify entity @s CustomNameVisible set value 1b')

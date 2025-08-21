@@ -103,6 +103,7 @@ mkfile(join(name, "data", "minecraft", "tags", "damage_type", "bypasses_cooldown
             "minecraft:explosion",
             "minecraft:dragon_breath",
             "minecraft:mob_projectile",
+            "minecraft:lightning_bolt",
             "minecraft:player_attack"
     ]
 }))
