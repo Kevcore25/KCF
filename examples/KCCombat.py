@@ -38,6 +38,11 @@ def load():
     sec()
     tick10()
 
+    trigger('stats')
+
+def triggers__stats():
+    run('tellraw @s ["",{"text":"Player Bonus Stats:","color":"aqua"},{"text":"\\n"},{"text":"Base DMG: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.dmgbonus"},"color":"green"},{"text":"%","color":"green"},{"text":" | Elemental Mastery: ","color":"light_purple"},{"score":{"name":"@s","objective":"em"},"color":"green"},{"text":"\\n"},{"text":"Status Chance: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.status"},"color":"green"},{"text":"%","color":"green"},{"text":"\\n"},{"text":"Critical Chance: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.cr"},"color":"green"},{"text":"%","color":"green"},{"text":" | Critical Damage: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.cd"},"color":"green"},{"text":"%","color":"green"},{"text":"\\n"},{"text":"Attack Speed: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.atkspd"},"color":"green"},{"text":"%","color":"green"},{"text":"\\n"},{"text":"Bonus Elemental DMG:","color":"aqua"},{"text":"\\n"},{"text":"Fire: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.fire"},"color":"green"},{"text":"%","color":"green"},{"text":" | Ice: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.ice"},"color":"green"},{"text":"%","color":"green"},{"text":" | Water: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.water"},"color":"green"},{"text":"%","color":"green"},{"text":"\\nElectric: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.electric"},"color":"green"},{"text":"%","color":"green"},{"text":" | Nature: ","color":"light_purple"},{"text":"+","color":"green"},{"score":{"name":"@s","objective":"stat.nature"},"color":"green"},{"text":"%","color":"green"},{"text":"\\n "}]')
+
 def giveweapon(Item, Name, Description, DMG, CR, CD, ATKSPD, Status, Fire, Ice, Water, Electric, Nature):
     run(f'give @s {Item}[custom_name=[{{"text":"{Name}","italic":false}}],lore=[[{{"text":"{Description}","italic":false,"color":"gray"}}],"",[{{"text":"Base DMG: {DMG}","italic":false,"color":"gray"}}],[{{"text":"Base Status: {Status}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Chance: {CR}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Damage: {CD}%","italic":false,"color":"gray"}}],[{{"text":"Base Attack Speed: {ATKSPD}/s","italic":false,"color":"gray"}}]],custom_data={{DMG: {DMG}, CR: {CR}, CD: {CD}, ATKSPD: {ATKSPD}, Status: {Status}, Fire: {Fire}, Ice: {Ice}, Water: {Water}, Electric: {Electric}, Nature: {Nature}}},attribute_modifiers=[{{type:attack_damage,amount:-0.9,slot:mainhand,id:"251",operation:add_value}},{{type:attack_speed,amount:-4,slot:mainhand,id:"252",operation:add_value}},{{type:attack_speed,amount:{ATKSPD},slot:mainhand,id:"253",operation:add_value}}]]')
 
@@ -149,7 +154,22 @@ def givebasic():
         "Electric": 0,
         "Nature": 0
     })
-
+def diamondsword():
+    giveweapon({
+        'Item': '"diamond_sword"',
+        'Name': '"Diamond Sword"',
+        "Description": '"Diamond Sword with the Ice status"',
+        "DMG": 200,
+        "CR": 25,
+        "CD": 120,
+        "ATKSPD": 1.6,
+        "Status": 20,
+        "Fire": 0,
+        "Ice": 1,
+        "Water": 0,
+        "Electric": 0,
+        "Nature": 0
+    })
 
 def displayreactionm(Name: str, Color: str, x: float, y: float, z: float):
     run(f'execute at @s positioned ~{x} ~{y} ~{z} run summon text_display ^ ^ ^ {{Tags:[notmob,dmgtext],teleport_duration:0,start_interpolation:-1,interpolation_duration:0,transformation:{{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[1.2f,1.2f,1.2f]}}, billboard:"center",see_through:1b,text:{{"color":"{Color}","text":"{Name}","bold":true}},background:268435456,glow_color_override:1b,Glowing:1b, shadow: 1b}}')
@@ -266,7 +286,7 @@ def elementEffects():
 def elementEffects10t():
     # Burning
     if self.burning > 0:
-        self.takedmg = 15 * self.takeem
+        self.takedmg = 8 * self.takeem
 
         # Shield = 2x less
         if self.shields > 0:
@@ -307,6 +327,7 @@ def sec():
     execute('as @e[type=stray]', set('self.ice', 20))
     execute('as @e[type=blaze]', set('self.fireS', 1))
     execute('as @e[type=blaze]', set('self.fire', 20))
+    execute('as @a', tickrelics)
 
 
 
@@ -400,6 +421,7 @@ def calcCriticals():
     self.cr *= (100 + self.tempcr)
 
     randint(self.rolltemp, 0, 10000)    
+    tellraw(_debugger, f"#yellow#CRIT RATE: {self.cr} > {self.rolltemp}")
 
     if self.cr > self.rolltemp:
         # Get CD
@@ -410,11 +432,10 @@ def calcCriticals():
 
         # Frozen bonus
         if _damagedEntity.frozen > 0:
-            self.tempcd += 4 * self.em * _damagedEntity.iceS
+            self.tempcd += 4 * self.em * self.iceS
 
         self.cd += self.cd * self.tempcd / 100
         self.cd += 100
-
         tellraw(_debugger, f"#yellow#CRIT DMG Multiplier: {self.cd}x")
         # Assume, CD = 50%, statCD = 100%
         # 50% += 50% * 100% / 100
@@ -705,8 +726,10 @@ def doWaterDMG():
 
     if self.waterS > 4:
         self.waterS = 0
-        execute('at @s', waterburst)
-
+        self.takedmg = 50 * self.takeem
+        doWaterDMG()
+        run('damage @s 1')
+        run('particle dolphin ~ ~ ~ 1.5 1.5 1.5 10 100')
 
 
 def doElectricDMG():
@@ -746,24 +769,30 @@ def calcPlayerWeaponDamage():
     store(self.gotfire, rollFire)
 
     if self.gotfire == 1: 
-        self.dmg *= (100 + self.stat.fire) / 100
+        self.dmg *= (100 + self.stat.fire)
+        self.dmg /= 100
 
         self.gotamt += 1
     store(self.gotice, rollIce)
     if self.gotice == 1: 
-        self.dmg *= (100 + self.stat.ice) / 100
+        self.dmg *= (100 + self.stat.ice)
+        self.dmg /= 100
         self.gotamt += 1
+
     store(self.gotwater, rollWater)
     if self.gotwater == 1: 
-        self.dmg *= (100 + self.stat.water) / 100
+        self.dmg *= (100 + self.stat.water)
+        self.dmg /= 100
         self.gotamt += 1
     store(self.gotelectric, rollElectric)
     if self.gotelectric == 1: 
-        self.dmg *= (100 + self.stat.electric) / 100
+        self.dmg *= (100 + self.stat.electric) 
+        self.dmg /= 100
         self.gotamt += 1
     store(self.gotnature, rollNature)
     if self.gotnature == 1: 
-        self.dmg *= (100 + self.stat.nature) / 100
+        self.dmg *= (100 + self.stat.nature)
+        self.dmg /= 100
         self.gotamt += 1
 
     # Apply criticals
@@ -1096,10 +1125,10 @@ def genericEntityTick():
         self.health = self.max_health
 
     if entity('@s[type=evoker_fangs,nbt={Warmup:-9}]'):
-        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', set(self.takedmg, 50))
-        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', set(self.electricS, 1))
-        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', multiply(self.takedmg, self.takeem))
-        execute('as @e[type=!evoker,type=!vex,distance=..1.5]', doNatureDMG)
+        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', set(self.takedmg, 50))
+        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', set(self.electricS, 1))
+        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', multiply(self.takedmg, self.takeem))
+        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', doNatureDMG)
 
 def onnewentity():
     tag(self, 'done')
@@ -1121,7 +1150,7 @@ def onnewentity():
         self.defense = 200
         self.max_shields = 250
     elif entity('@s[type = evoker]'):
-        self.max_health = 2000
+        self.max_health = 4000
         self.defense = 200
         self.max_shields = 1000
         attribute(self, scale, 1.25)
@@ -1222,16 +1251,16 @@ def dmgtextanimation():
     if self.temp == 2: run('data modify entity @s text_opacity set value 64')
     if self.temp == 1: run('data modify entity @s text_opacity set value 16')
 
-    if self.temp == 31: run('data modify entity @s text_opacity set value -1')
-    if self.temp == 32: run('data modify entity @s text_opacity set value -32')
-    if self.temp == 33: run('data modify entity @s text_opacity set value -64')
-    if self.temp == 34: run('data modify entity @s text_opacity set value -96')
-    if self.temp == 35: run('data modify entity @s text_opacity set value -128')
-    if self.temp == 36: run('data modify entity @s text_opacity set value 96')
-    if self.temp == 37: run('data modify entity @s text_opacity set value 64')
-    if self.temp == 38: run('data modify entity @s text_opacity set value 32')
-    if self.temp == 39: run('data modify entity @s text_opacity set value 16')
-    if self.temp == 40: 
+    if self.temp == 21: run('data modify entity @s text_opacity set value -1')
+    if self.temp == 22: run('data modify entity @s text_opacity set value -32')
+    if self.temp == 23: run('data modify entity @s text_opacity set value -64')
+    if self.temp == 24: run('data modify entity @s text_opacity set value -96')
+    if self.temp == 25: run('data modify entity @s text_opacity set value -128')
+    if self.temp == 26: run('data modify entity @s text_opacity set value 96')
+    if self.temp == 27: run('data modify entity @s text_opacity set value 64')
+    if self.temp == 28: run('data modify entity @s text_opacity set value 32')
+    if self.temp == 29: run('data modify entity @s text_opacity set value 16')
+    if self.temp == 30: 
         kill(self)
 
 def ww():                   
@@ -1261,15 +1290,15 @@ def summonww():
 """ RELICS """
 def applystats():
     # selector: relic
-    randint(self.times, 3, 4)
+    randint(self.times, 16, 24)
     for i in range(self.times):
         # Random Stat
-        randint('self.stat', 0, 5)
+        randint('self.stat', 0, 10)
 
         if self.stat == 0:
             run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+10% Base DMG", "italic": false}')
             store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".BaseDMG'))
-            self.temp += 10
+            self.temp += 15
             run('execute store result entity @s Item.components."minecraft:custom_data".BaseDMG int 1 run scoreboard players get @s temp')
         elif self.stat == 1:
             run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+10% Critical Chance", "italic": false}')
@@ -1294,10 +1323,94 @@ def applystats():
         elif self.stat == 5:
             run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+10% Status Rate", "italic": false}')
             store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".Status'))
-            self.temp += 1
+            self.temp += 10
             run('execute store result entity @s Item.components."minecraft:custom_data".Status int 1 run scoreboard players get @s temp')
+        elif self.stat == 6:
+            run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+5% Fire DMG Bonus", "italic": false}')
+            store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".Fire'))
+            self.temp += 5
+            run('execute store result entity @s Item.components."minecraft:custom_data".Fire int 1 run scoreboard players get @s temp')
+        elif self.stat == 7:
+            run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+5% Ice DMG Bonus", "italic": false}')
+            store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".Ice'))
+            self.temp += 5
+            run('execute store result entity @s Item.components."minecraft:custom_data".Ice int 1 run scoreboard players get @s temp')
+        elif self.stat == 8:
+            run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+5% Water DMG Bonus", "italic": false}')
+            store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".Water'))
+            self.temp += 5
+            run('execute store result entity @s Item.components."minecraft:custom_data".Water int 1 run scoreboard players get @s temp')
+        elif self.stat == 9:
+            run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+5% Electric DMG Bonus", "italic": false}')
+            store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".FiElectricre'))
+            self.temp += 5
+            run('execute store result entity @s Item.components."minecraft:custom_data".Electric int 1 run scoreboard players get @s temp')
+        elif self.stat == 10:
+            run('data modify entity @s Item.components."minecraft:lore" append value {"color": "aqua", "text": "+5% Nature DMG Bonus", "italic": false}')
+            store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".Nature'))
+            self.temp += 5
+            run('execute store result entity @s Item.components."minecraft:custom_data".FiNaturere int 1 run scoreboard players get @s temp')
 
     run('data modify entity @s PickupDelay set value 0')
+
+
+def tickrelics():
+    # Selector: player
+    store(self.stat.dmgbonus, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".BaseDMG'))
+    store(self.stat.cr, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".CR'))
+    store(self.stat.cd, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".CD'))
+    store(self.em, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".EM'))
+    store(self.stat.status, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".Status'))
+
+    store(self.stat.fire, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".Fire'))
+    store(self.stat.ice, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".Ice'))
+    store(self.stat.water, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".Water'))
+    store(self.stat.electric, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".Electric'))
+    store(self.stat.nature, getdata(self, 'Inventory[{Slot:9b}].components."minecraft:custom_data".Nature'))
+
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".BaseDMG'))
+    self.stat.dmgbonus += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".CR'))
+    self.stat.cr += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".CD'))
+    self.stat.cd += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".EM'))
+    self.em += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".Status'))
+    self.stat.status += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".Fire'))
+    self.stat.fire += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".Ice'))
+    self.stat.ice += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".Water'))
+    self.stat.water += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".Electric'))
+    self.stat.electric += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:18b}].components."minecraft:custom_data".Nature'))
+    self.stat.nature += self.temp
+
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".BaseDMG'))
+    self.stat.dmgbonus += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".CR'))
+    self.stat.cr += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".CD'))
+    self.stat.cd += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".EM'))
+    self.em += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".Status'))
+    self.stat.status += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".Fire'))
+    self.stat.fire += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".Ice'))
+    self.stat.ice += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".Water'))
+    self.stat.water += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".Electric'))
+    self.stat.electric += self.temp
+    store(self.temp, getdata(self, 'Inventory[{Slot:27b}].components."minecraft:custom_data".Nature'))
+
+    self.em += 5
+
 
 def summonrelic():
     run('summon item ~ ~ ~ {Tags:[relicNotDone],PickupDelay:100,Item:{id:"minecraft:coal",count:1,components:{"minecraft:custom_data":{},"minecraft:lore":[{"color":"light_purple","text":"Relic Stats:", "italic": false}]}}}')
