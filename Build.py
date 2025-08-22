@@ -12,7 +12,8 @@ PACK_VERSION = 80 # 71 is 1.21.5
 
 import json, KCFPy
 import shutil, os
-
+import zipfile
+import tempfile
 
 
 # Welcome message
@@ -30,9 +31,10 @@ with open(CONFIG_FILE, 'r') as f:
 namespace = configs['MCFunction Namespace']
 name = configs['Datapack Name']
 source = configs['Build Source File']
-destination = configs['Build Destination']
+finaldestination = configs['Build Destination']
 description = configs['Datapack Description']
 error_threshold = configs['Error Threshold']
+zipison = configs['Zip file']
 
 # Get Code
 print("Getting code...")
@@ -50,11 +52,8 @@ print("Building code...")
 # Build to memory
 t.build()
 
-# Print to console - optional
-# t.print()
-
-print("Creating datapack structure...")
 # Create datpack
+print("Creating datapack structure...")
 
 join = os.path.join
 
@@ -66,14 +65,24 @@ def mkdir(path: str):
     if not os.path.isdir(path):
         os.mkdir(path)
 
-mkdir(destination)
-os.chdir(destination)
+if zipison:
+    # Create a temp folder for now
+    # Later, it will ZIP the file to conserve disk + make it easier for SAMBA
+    destination = 'kcftempbuildfolder'
+    if os.path.isdir(destination):
+        shutil.rmtree(destination, ignore_errors=True)
+    os.mkdir(destination)
+    os.chdir(destination)
+else:
+    destination = finaldestination
+    mkdir(destination)
+    os.chdir(destination)
 
-# Delete
-print("Deleting old files...")
+    # Delete
+    print("Deleting old files...")
 
-if os.path.isdir(name):
-    shutil.rmtree(name, ignore_errors=True)
+    if os.path.isdir(name):
+        shutil.rmtree(name, ignore_errors=True)
 
 mkdir(name)
 mkdir(join(name, "data"))
@@ -122,10 +131,23 @@ mkfile(join(name, "data", "minecraft", "tags", "function", "tick.json"), json.du
 # Write
 print("Writing code...")
 
-
 dest = join(name, "data", namespace, "function")
 
 t.write_files(dest)
+
+if zipison:
+    # Zip fi1le
+    print("Zipping files...")
+    zipname = os.path.join(finaldestination, name)
+    shutil.make_archive(zipname, 'zip', root_dir=name)
+
+    # print("Copying ZIP file to location...")
+    # shutil.copyfile(zipname, finaldestination)
+
+    print("Cleaning up...")
+    # os.remove(zipname)
+    os.chdir('..')
+    shutil.rmtree("kcftempbuildfolder")
 
 # print("Done!")
 # input("Press enter to continue...\t")

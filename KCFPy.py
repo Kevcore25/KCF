@@ -403,8 +403,18 @@ class KCF:
         else:
             return ""
 
-    def get_func(self, function: ast.Name | ast.Lambda | ast.Call, filename: str = ""):
-        if isinstance(function, ast.Name):
+    def get_func(self, function: ast.Name | ast.Lambda | ast.Call | ast.Tuple, filename: str = ""):
+        if isinstance(function, ast.Tuple):
+            fname = (filename + f'_lmb{self.conditions}').replace('__', '/').lower()
+            self.conditions += 1
+
+            code = '\n'.join(self.get_func(i, filename) for i in function.elts)
+            if code.count('\n') == 0:
+                return code
+            else:
+                self.write(fname, code)
+                return f"function {self.namespace}:{fname}"
+        elif isinstance(function, ast.Name):
             return f"function {self.namespace}:{function.id.replace('__', '/').lower()}" 
         elif isinstance(function, ast.Lambda):                
             fname = (filename + f'_lmb{self.conditions}').replace('__', '/').lower()
@@ -462,7 +472,11 @@ class KCF:
                     return f"fill {self.get_value(args[0])} {self.get_value(args[1])} {self.get_value(args[2])} {args[3].id}"
 
             case "execute":
-                return (f"execute {' '.join(i.value for i in args[:-1])} run {self.get_func(args[-1], filename)}")
+                funcs = self.get_func(args[-1], filename)
+                if isinstance(funcs, list):
+                    return '\n'.join(f"execute {' '.join(i.value for i in args[:-1])} run {f}" for f in funcs)
+                else:
+                    return (f"execute {' '.join(i.value for i in args[:-1])} run {funcs}")
             
             case "effect":
                 if len(args) == 2:
@@ -1145,7 +1159,7 @@ class KCF:
 
         # Expression 
         if isinstance(expression.orelse, ast.Call):
-            condition = condition.replace("%end%", f"run function {self.namespace}:{fname}")
+            condition = condition.replace("%end%", f"run function {self.namespace}:{fname} with storage {self.namespace}:functionargs")
 
             self.write(fname, self.parse([ast.Expr(value=expression.body)], fname))            
             
@@ -1159,7 +1173,7 @@ class KCF:
             if code.count('\n') == 0:
                 condition = condition.replace("%end%", "run " + code)
             else:
-                condition = condition.replace("%end%", f"run function {self.namespace}:{fname}")
+                condition = condition.replace("%end%", f"run function {self.namespace}:{fname} with storage {self.namespace}:functionargs")
                 self.write(fname, self.parse(expression.body, fname))            
                 
             return condition
@@ -1177,12 +1191,12 @@ class KCF:
             if body.count("\n") == 0:
                 condition = condition.replace("%end%", f"run return run {body}")
             else:
-                condition = condition.replace("%end%", f"run return run function {self.namespace}:{fname}t")
+                condition = condition.replace("%end%", f"run return run function {self.namespace}:{fname}t with storage {self.namespace}:functionargs")
                 self.write(fname + "t", body)
 
             self.write(fname, condition + "\n" + self.parse(expression.orelse, fname))
 
-            return (f"function {self.namespace}:{fname}")
+            return (f"function {self.namespace}:{fname} with storage {self.namespace}:functionargs")
         
     def parse_dict(self, data: ast.Dict):
         values = []
