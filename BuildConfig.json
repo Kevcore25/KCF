@@ -1,7 +1,9 @@
 {
     "Build Source File": "Code.py",
     "Build Destination": ".",
-
+    
+    "Zip file": false,
+    
     "Datapack Name": "My Datapack",
     "Datapack Description": "Made using KCF-Py",
 
