@@ -139,7 +139,7 @@ if zipison:
     # Zip fi1le
     print("Zipping files...")
     zipname = os.path.join(finaldestination, name)
-    shutil.make_archive(zipname, 'zip', root_dir=name)
+    shutil.make_archive(zipname, 'zip', root_dir=name, verbose=True)
 
     # print("Copying ZIP file to location...")
     # shutil.copyfile(zipname, finaldestination)
@@ -151,6 +151,6 @@ if zipison:
 
 # print("Done!")
 # input("Press enter to continue...\t")
-t.print()
+# t.print()
 t.print_stats()
 t.print_warnings()

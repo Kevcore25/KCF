@@ -250,7 +250,7 @@ class KCF:
         self.precision = 2
         self.variables = {}
         self.triggers = []
-        self.pNumbers = []
+        self.pNumbers: list[int] = []
         self.tempi = 0
 
         self.ERROR_THRESHOLD = 1
@@ -384,6 +384,13 @@ class KCF:
                                 temp = {"score": {"objective": varName, "name": entity}}
                             case "entity" | "player" | "selector":
                                 temp = {"selector": self.parse_entity((value.value))}
+                            case _:
+                                if t.startswith('run(') and t[-1] == ')':
+                                    # t would be of: run(command). We need to get the command part
+                                    # Since it is stripped, we will assume it is of correct format and will not care about misspelled for now
+                                    # After all, the RUN function is for advanced users and not for beginners
+                                    cmd = t[4:-1]
+                                    temp = {"text": self.get_value(value.value), "click_event":{"action":"run_command","command": cmd}}
 
                         # Apply colour
                         if c is not None:
@@ -439,6 +446,32 @@ class KCF:
 
         self.raise_error(filename, "Not a valid function type", ast.unparse(function), 4)
     
+    def get_force_func(self, function: ast.Name | ast.Lambda | ast.Call | ast.Tuple, filename: str = ""):
+        if isinstance(function, ast.Tuple):
+            fname = (filename + f'_lmb{self.conditions}').replace('__', '/').lower()
+            self.conditions += 1
+
+            code = '\n'.join(self.get_func(i, filename) for i in function.elts)
+            self.write(fname, code)
+            return f"function {self.namespace}:{fname}"
+        elif isinstance(function, ast.Name):
+            return f"function {self.namespace}:{function.id.replace('__', '/').lower()}" 
+        elif isinstance(function, ast.Lambda):                
+            fname = (filename + f'_lmb{self.conditions}').replace('__', '/').lower()
+            self.conditions += 1
+
+            code = self.parse([ast.Expr(value=function.body)], fname)
+            self.write(fname, code)
+            return f"function {self.namespace}:{fname}"
+        elif isinstance(function, ast.Call):
+            fname = (filename + f'_lmb{self.conditions}').lower()
+            self.conditions += 1
+
+            code = self.parse([ast.Expr(value=function)], fname)
+            self.write(fname, code)
+            return f"function {self.namespace}:{fname}"
+
+        self.raise_error(filename, "Not a valid function type", ast.unparse(function), 4)
     def warn(self, message: str):
         self.warnings.append(message)
 
@@ -596,7 +629,10 @@ class KCF:
                 if t.isdigit():
                     t += 't'
 
-                return f"schedule function {self.namespace}:{self.get_value(args[1]).replace('__', '/').lower()} {t}"
+                # return f"schedule function {self.namespace}:{self.get_value(args[1]).replace('__', '/').lower()} {t}"
+                # EXPERIMENTAL: Use a new get_force_func which is essentially get_func but will always return "function ..."
+                # This allows for schedule('1t', add(self.var, 1))
+                return f"schedule {self.get_force_func(args[1], filename)} {t}"
 
             case "gamemode":
                 return f"gamemode {self.get_value(args[1])} {self.get_player(self.get_value(args[0]))}"
@@ -647,6 +683,9 @@ class KCF:
                 
             case "setdata":
                 return f"data modify entity {self.parse_entity(args[0])} {self.get_value(args[1])} {self.get_abs_value(args[2])}"
+            
+            case "tp" | "teleport":
+                return f"tp {self.parse_entity(args[0])} {self.get_value(args[1])}"
 
             case _:
                 # Call custom function. Args must be of NAME value
@@ -742,6 +781,9 @@ class KCF:
 
         return y, n
     
+    def is_int(self, value: ast.Constant | ast.UnaryOp) -> True:
+        return (isinstance(value, ast.Constant) and isinstance(value.value, int)) or (isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub) and isinstance(value.operand, ast.Constant))
+    
     def parse_condition(self, condition, starting = 'execute ', opp = False):
         """
         Complex algorithm that parses a conditional statement obj.
@@ -754,29 +796,65 @@ class KCF:
 
             y, n = self.bool_to_if(not opp)
 
-            if isinstance(value, ast.Compare):                    
-                entity, varName = self.parse_var(value.left)
-
-                if isinstance(value.comparators[0], ast.Constant) or isinstance(value.comparators[0], ast.UnaryOp):
-                    if isinstance(value.ops[0], ast.Eq):
-                        temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[0])} ")
-                    elif isinstance(value.ops[0], ast.NotEq):
-                        temp += (f"{n} score {entity} {varName} matches {self.get_int(value.comparators[0])} ")
-                    elif isinstance(value.ops[0], ast.Gt):
-                        temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[0]) + 1}.. ")
-                    elif isinstance(value.ops[0], ast.GtE):
-                        temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[0])}.. ")
-                    elif isinstance(value.ops[0], ast.Lt):
-                        temp += (f"{y} score {entity} {varName} matches ..{self.get_int(value.comparators[0]) - 1} ")
-                    elif isinstance(value.ops[0], ast.LtE):
-                        temp += (f"{y} score {entity} {varName} matches ..{self.get_int(value.comparators[0])} ")
+            if isinstance(value, ast.Compare):
+                # Cool edge case: If left and right are ints, AND they are ALL LTs()
+                # This utilizes Minecraft's a..b system, which may optimize things
+                # Otherwise, the else statement will activate 
+                if (
+                    # 2 Lts()
+                    len(value.ops) == 2 and isinstance(value.ops[0], ast.Lt) and isinstance(value.ops[1], ast.Lt) and
+                    # Left & Rights are INTS
+                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                ):
+                    entity, varName = self.parse_var(value.comparators[0])
+                    temp += (f"{y} score {entity} {varName} matches {self.get_int(value.left) + 1}..{self.get_int(value.comparators[1]) - 1} ")
+                elif (
+                    # 2 Gts() - same thing but reverse
+                    len(value.ops) == 2 and isinstance(value.ops[0], ast.Gt) and isinstance(value.ops[1], ast.Gt) and
+                    # Left & Rights are INTS
+                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                ):
+                    entity, varName = self.parse_var(value.comparators[0])
+                    temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[1]) + 1}..{self.get_int(value.left) - 1} ")
+                elif (
+                    # 2 LtEs()
+                    len(value.ops) == 2 and isinstance(value.ops[0], ast.LtE) and isinstance(value.ops[1], ast.LtE) and
+                    # Left & Rights are INTS
+                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                ):
+                    entity, varName = self.parse_var(value.comparators[0])
+                    temp += (f"{y} score {entity} {varName} matches {self.get_int(value.left)}..{self.get_int(value.comparators[1])} ")
+                elif (
+                    # 2 GtEs() - same thing but reverse
+                    len(value.ops) == 2 and isinstance(value.ops[0], ast.GtE) and isinstance(value.ops[1], ast.GtE) and
+                    # Left & Rights are INTS
+                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                ):
+                    entity, varName = self.parse_var(value.comparators[0])
+                    temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[1])}..{self.get_int(value.left)} ")
                 else:
-                    entity2, varName2 = self.parse_var(value.comparators[0])
-                    # Detect 
-                    if isinstance(value.ops[0], ast.NotEq):
-                        temp += f"{n} score {entity} {varName} = {entity2} {varName2} "
-                    else:
-                        temp += f"{y} score {entity} {varName} {convert_condition_astobj(value.ops[0])} {entity2} {varName2} "
+                    entity, varName = self.parse_var(value.left)
+                    for i in range(len(value.ops)):
+                        if isinstance(value.comparators[i], ast.Constant) or isinstance(value.comparators[i], ast.UnaryOp):
+                            if isinstance(value.ops[i], ast.Eq):
+                                temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[i])} ")
+                            elif isinstance(value.ops[i], ast.NotEq):
+                                temp += (f"{n} score {entity} {varName} matches {self.get_int(value.comparators[i])} ")
+                            elif isinstance(value.ops[i], ast.Gt):
+                                temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[i]) + 1}.. ")
+                            elif isinstance(value.ops[i], ast.GtE):
+                                temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[i])}.. ")
+                            elif isinstance(value.ops[i], ast.Lt):
+                                temp += (f"{y} score {entity} {varName} matches ..{self.get_int(value.comparators[i]) - 1} ")
+                            elif isinstance(value.ops[i], ast.LtE):
+                                temp += (f"{y} score {entity} {varName} matches ..{self.get_int(value.comparators[i])} ")
+                        else:
+                            entity2, varName2 = self.parse_var(value.comparators[i])
+                            # Detect 
+                            if isinstance(value.ops[i], ast.NotEq):
+                                temp += f"{n} score {entity} {varName} = {entity2} {varName2} "
+                            else:
+                                temp += f"{y} score {entity} {varName} {convert_condition_astobj(value.ops[i])} {entity2} {varName2} "
 
             elif isinstance(value, ast.Call):
                 match value.func.id:
@@ -831,6 +909,10 @@ class KCF:
                 a, b = self.get_entity(entity), varName
             else:
                 a, b = "#global", expression.value
+        elif isinstance(expression, ast.Constant) and isinstance(expression.value, int):
+            a, b = expression.value, "p-numbers"
+            if expression.value not in self.pNumbers:
+                self.pNumbers.append(expression.value)
         elif isinstance(expression, ast.Attribute):
             if isinstance(expression.value, ast.Attribute):
                 d, e = self.parse_var(expression.value)
@@ -1124,15 +1206,15 @@ class KCF:
                 entity1, varName1 = self.parse_var(var)
 
                 if isinstance(expression.op, ast.Add):
-                    temp.append (f"scoreboard players operation {entity} {varName} += {entity1} {varName1}")
+                    temp.append(f"scoreboard players operation {entity} {varName} += {entity1} {varName1}")
                 elif isinstance(expression.op, ast.Sub):
-                    temp.append (f"scoreboard players operation {entity} {varName} -= {entity1} {varName1}")
+                    temp.append(f"scoreboard players operation {entity} {varName} -= {entity1} {varName1}")
                 elif isinstance(expression.op, ast.Mult):
-                    temp.append (f"scoreboard players operation {entity} {varName} *= {entity1} {varName1}")
+                    temp.append(f"scoreboard players operation {entity} {varName} *= {entity1} {varName1}")
                 elif isinstance(expression.op, ast.Div) or isinstance(expression.op, ast.FloorDiv):
-                    temp.append (f"scoreboard players operation {entity} {varName} /= {entity1} {varName1}")
+                    temp.append(f"scoreboard players operation {entity} {varName} /= {entity1} {varName1}")
                 elif isinstance(expression.op, ast.Mod):
-                    temp.append (f"scoreboard players operation {entity} {varName} %= {entity1} {varName1}")
+                    temp.append(f"scoreboard players operation {entity} {varName} %= {entity1} {varName1}")
         return temp
     
     def ifexpr(self, expression: ast.If, filename: str):
@@ -1268,8 +1350,7 @@ class KCF:
                                         elif isinstance(v, ast.FormattedValue):
                                             temp += f"$({v.value.id})"
 
-                                    if not temp.startswith('$'):
-                                        temp = '$' + temp
+                                    temp = '$' + temp
 
                                     cmds.append(temp)
     
@@ -1406,9 +1487,7 @@ class KCF:
         5. Extreme disallowed.
 
         Therefore if the ERROR_THRESHOLD is set to 5+, all custom errors are ignored
-        """
-
-    
+        """    
         
         ErrorMessage = self.raise_message(filename, message, keywords)  
 
@@ -1485,7 +1564,7 @@ class KCF:
 
         # ADD VARIABLES
         for var, t in self.variables.items():
-            if t == 'dummy' and var != '.temp':
+            if t == 'dummy' and var != '.temp' and f"scoreboard objectives add {var} " not in self.files['load']:
                 v = f"scoreboard objectives add {var} dummy"
                 if v not in self.files['load'].splitlines():
                     self.files['load'] = v + "\n" + self.files['load']
