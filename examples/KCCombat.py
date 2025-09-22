@@ -47,7 +47,7 @@ def lt_normal():
             run('summon experience_orb ~ ~ ~ {Value:1}')
         randint(self.temp, 1, 100)
         if level < 50:
-            if 'score @s temp matches 1..20' and level < 20: 
+            if 'score @s temp matches 1..20' and level < 10: 
                 run('summon item ~ ~ ~ {Item:{id:"minecraft:leather_horse_armor",count:1,components:{"minecraft:item_name":"Bronze Relic", "minecraft:custom_data":{GetRelic:1}}}}')
             elif 'score @s temp matches 21..25': 
                 run('summon item ~ ~ ~ {Item:{id:"minecraft:iron_horse_armor",count:1,components:{"minecraft:item_name":"Silver Relic", "minecraft:custom_data":{GetRelic:1}}}}')
@@ -61,7 +61,7 @@ def lt_normal():
         # FLOWERS
         randint(self.temp, 1, 1000)
         if level < 50:
-            if 'score @s temp matches 1..100' and level < 30: 
+            if 'score @s temp matches 1..100' and level < 20: 
                 run('summon item ~ ~ ~ {Item:{id:"minecraft:white_tulip",count:1,components:{"minecraft:item_name":"White Flower", "minecraft:custom_data":{GetRelic:1}}}}')
             elif 'score @s temp matches 101..130': 
                 run('summon item ~ ~ ~ {Item:{id:"minecraft:orange_tulip",count:1,components:{"minecraft:item_name":"Orange Flower", "minecraft:custom_data":{GetRelic:1}}}}')
@@ -101,7 +101,7 @@ def lt_elite():
         run('summon item ~ ~ ~ {Item:{id:"minecraft:sunflower",count:5,components:{"minecraft:item_name":"Coin"}}}')
         run('summon experience_orb ~ ~ ~ {Value:16}')
 
-        if level < 20:
+        if level < 10:
             run('summon item ~ ~ ~ {Item:{id:"minecraft:leather_horse_armor",count:1,components:{"minecraft:item_name":"Bronze Relic", "minecraft:custom_data":{GetRelic:1}}}}')
             run('summon item ~ ~ ~ {Item:{id:"minecraft:white_tulip",count:1,components:{"minecraft:item_name":"White Flower", "minecraft:custom_data":{GetRelic:1}}}}')
         elif level < 50:
@@ -110,7 +110,7 @@ def lt_elite():
 
         randint(self.temp, 1, 100)
         if level < 50:
-            if 'score @s temp matches 1..50' and level < 30: 
+            if 'score @s temp matches 1..50' and level < 25: 
                 run('summon item ~ ~ ~ {Item:{id:"minecraft:iron_horse_armor",count:1,components:{"minecraft:item_name":"Silver Relic", "minecraft:custom_data":{GetRelic:1}}}}')
             elif 'score @s temp matches 51..71': 
                 run('summon item ~ ~ ~ {Item:{id:"minecraft:golden_horse_armor",count:1,components:{"minecraft:item_name":"Gold Relic", "minecraft:custom_data":{GetRelic:1}}}}')
@@ -220,6 +220,7 @@ def load():
     run('gamerule naturalRegeneration false')
     run('gamerule doMobSpawning false')
     run('gamerule mobGriefing false')
+    run('gamerule commandModificationBlockLimit 1000000')
 
     run('team add mob "Mob team"')
 
@@ -241,6 +242,9 @@ def load():
     run('bossbar set timer max 1800')
     run('bossbar set timer color yellow')
 
+    '@a[gamemode=creative]'.invincible += 20
+    '@a[gamemode=spectator]'.invincible += 20
+
 def triggers__start():
     if self.start == 1:
         difficulty = 2
@@ -251,21 +255,21 @@ def triggers__start():
     start()
 
 def spawnArena():
-    fill('-9 -62 -9', '25 3 25', barrier, hollow)
+    fill('-9 -62 -9', '25 3 25', quartz_block, hollow)
     run('fill -8 -61 -8 24 -61 24 minecraft:grass_block')
     run('fill 24 -60 24 10 -60 10 grass_block')
     run('fill 9 -60 24 9 -60 13 minecraft:grass_block')
     run('fill 8 -60 19 8 -60 24 minecraft:grass_block')
     run('fill 10 -60 11 13 -60 11 air')
     run('fill 10 -60 10 16 -60 10 air')
-
-    run('fill -8 3 24 24 3 -8 air')
+    run('fill 26 7 26 -10 3 -10 minecraft:quartz_block hollow')
+    run('fill -9 7 -9 25 7 25 air')
 
     # Now add some grass!
     for i in range(16):
         summon(pig, '~ ~ ~', {'Tags': '[arenagrass]'})
     
-    run('spreadplayers 8 8 8 16 false @e[type=pig,tag=arenagrass]')
+    run('spreadplayers 8 8 8 16 under -32 false @e[type=pig,tag=arenagrass]')
 
     execute('at @e[type=pig,tag=arenagrass]', (
         run('setblock ~ ~-2 ~ dispenser[facing=up,triggered=false]{Items:[{Slot:0b,id:"minecraft:bone_meal",count:1}]} replace'),
@@ -278,6 +282,14 @@ def spawnArena():
         tp('@e[type=pig, tag=arenagrass]', '0 -100 0')
         kill('@e[type=pig, tag=arenagrass]')
         kill('@e[type=item]')
+        run('fill 24 -62 24 -8 -62 -8 bedrock')
+        createmsg()
+
+    def createmsg():
+        kill('@e[tag=joinmsg]')
+        run('summon text_display 8.5 5.0 25.9 {Tags:[notmob,important,joinmsg],Rotation:[-180F,0F],transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[5f,5f,5f]},text:[{"color":"#FFF700","text":"C"},{"color":"#FDF800","text":"l"},{"color":"#FCF801","text":"i"},{"color":"#FAF901","text":"c"},{"color":"#F9FA02","text":"k "},{"color":"#F7FB02","text":"t"},{"color":"#F6FB03","text":"o "},{"color":"#F4FC03","text":"J"},{"color":"#F3FD04","text":"o"},{"color":"#F1FE04","text":"i"},{"color":"#EEFF05","text":"n"}],background:16711680}')
+        run('summon interaction 8.5 4.75 29.5 {width:9f,height:2f,response:1b,Tags:[joinInteraction,joinmsg,important,notmob]}')
+        run('summon text_display 8 4 20 {Tags:[notmob,important,joinmsg],billboard:"vertical",text:[{"bold":true,"color":"yellow","text":"Welcome to KCSurvival"},{"bold":false,"color":"aqua","text":"\\nKCSurvival is a floor based gamemode with a RPG touch to the survival experience."},{"color":"green","text":"\\n\\nCan you beat all 50 floors?"},{"bold":false,"color":"yellow","text":"\\n\\nType /trigger start to play\\nType /trigger start set # for difficulty\\n1 = easy, 2 = normal, 3 = hard"}],background:268435456}')
 
     schedule('5t', sacleanup)
 
@@ -380,16 +392,16 @@ def compileweapons():
     addstandardweapon({
         'ID': '"diamondsword"', 'Cost': 200, 'NormalCost': 180,
         'Item': '"diamond_sword"', 'Name': '"Diamond Sword"',
-        "Description": '"The diamond sword focused heavily on its Critical abilities, and is considered to be the best out of the standard swords with its downside being the price required to buy it."',
+        "Description": '"The diamond sword focused heavily on its Critical abilities, enhancing mid-game combat."',
         "DMG": 200, "CR": 35, "CD": 120,
-        "Status": 15, "ATKSPD": 1.6
+        "Status": 20, "ATKSPD": 1.6
     })
     addstandardweapon({
         'ID': '"ironsword"', 'Cost': 100, 'NormalCost': 80,
         'Item': '"iron_sword"', 'Name': '"Iron Sword"',
         "Description": '"The standard sword wielded by many major swordsman with its decent DMG, status chance, and its critical abilities"',
-        "DMG": 185, "CR": 20, "CD": 50,
-        "Status": 25, "ATKSPD": 1.6
+        "DMG": 185, "CR": 25, "CD": 75,
+        "Status": 35, "ATKSPD": 1.6
     })
     addstandardweapon({
         'ID': '"coppersword"', 'Cost': 75, 'NormalCost': 20,
@@ -401,8 +413,8 @@ def compileweapons():
     addstandardweapon({
         'ID': '"goldensword"', 'Cost': 150, 'NormalCost': 135,
         'Item': '"golden_sword"', 'Name': '"Golden Sword"',
-        "Description": '"The golden sword focused heavily on its status performance and damage output but lacked attack speed."',
-        "DMG": 250, "CR": 10, "CD": 50,
+        "Description": '"The heavy golden sword focused heavily on its damage and status chance, but lacked Critical abilities."',
+        "DMG": 400, "CR": 10, "CD": 75,
         "Status": 80, "ATKSPD": 1
     })
     addstandardweapon({
@@ -649,7 +661,7 @@ def sec():
     def arenaticks():
         # Player determination
         arenaNumOfPlayers=0
-        execute('as @a[distance=..24]', add(arenaNumOfPlayers, 1))
+        execute('as @a[distance=..24,gamemode=adventure]', add(arenaNumOfPlayers, 1))
         if started == 1 and arenaNumOfPlayers == 0:
             print(f"#red,b#All players in the arena have died. Game stopped.\n#r,red#You have made it to Floor {level}!")
             stop()
@@ -663,12 +675,17 @@ def sec():
 
     execute('positioned 8 -60 8', arenaticks)
 
+    execute('positioned 8 4 8', run('item replace entity @a[distance=..30] hotbar.0 with minecraft:spyglass'))
+
+    execute('as @e[type=enderman] at @s', endermanEffects)
+
+
 def rollFire():
     store(self.rolltemp, getdata(self, 'SelectedItem.components."minecraft:custom_data".Fire'))    
     
     self.rolltemp2 = 0
     if self.rolltemp == 1:
-        randint(self.rolltemp, 0, 10000)     
+        randint(self.rolltemp, 1, 10000)     
         if self.status >= self.rolltemp:
             self.rolltemp2 = 1
     elif self.rolltemp == 2:
@@ -684,7 +701,7 @@ def rollIce():
     
     self.rolltemp2 = 0
     if self.rolltemp == 1:
-        randint(self.rolltemp, 0, 10000)        
+        randint(self.rolltemp, 1, 10000)        
         if self.status >= self.rolltemp:
             self.rolltemp2 = 1
     elif self.rolltemp == 2:
@@ -699,7 +716,7 @@ def rollWater():
     
     self.rolltemp2 = 0
     if self.rolltemp == 1:
-        randint(self.rolltemp, 0, 10000)        
+        randint(self.rolltemp, 1, 10000)        
         if self.status >= self.rolltemp:
             self.rolltemp2 = 1
     elif self.rolltemp == 2:
@@ -714,7 +731,7 @@ def rollElectric():
     
     self.rolltemp2 = 0
     if self.rolltemp == 1:
-        randint(self.rolltemp, 0, 10000)        
+        randint(self.rolltemp, 1, 10000)        
         if self.status >= self.rolltemp:
             self.rolltemp2 = 1
     elif self.rolltemp == 2:
@@ -729,7 +746,7 @@ def rollNature():
     
     self.rolltemp2 = 0
     if self.rolltemp == 1:
-        randint(self.rolltemp, 0, 10000)        
+        randint(self.rolltemp, 1, 10000)        
         if self.status >= self.rolltemp:
             self.rolltemp2 = 1
     elif self.rolltemp == 2:
@@ -768,7 +785,7 @@ def calcCriticals():
     self.crittimes /= 10000
     # Now get remaining CR and test if it worked
     self.cr %= 10000
-    randint(self.rolltemp, 0, 10000)    
+    randint(self.rolltemp, 1, 10000)    
     tellraw(_debugger, f"#yellow#CRIT RATE: {self.cr} > {self.rolltemp} (Currently have {self.crittimes} crittimes)")
     if self.cr > self.rolltemp:
         self.crittimes += 1
@@ -864,11 +881,11 @@ def defcalc():
 def setshieldcd():
     if entity(_player):        
         self.shieldCD = 40
-        self.shieldCD -= self.stat.shieldcd        
+        self.shieldCD -= self.stat.shieldcd
         if difficulty == 3:
             self.shieldCD += 10
     else:
-        self.shieldCD = 40
+        self.shieldCD = 50
 
 def calcda():
     # DMG Attenuation
@@ -893,7 +910,6 @@ def calcda():
                 else:
                     self.takedmg *= self.da.reduc
                     self.takedmg /= 100
-        print(f'DA Values: {self.da.x}/{self.da.a} ({self.da.reduc}% DMG Efficiency)')
 
 def doFinalDMG():
     setshieldcd()
@@ -902,7 +918,7 @@ def doFinalDMG():
         return
     
     # Dodge Chance
-    if entity(_player):
+    if entity(_player) and not self.invincible > 0:
         randint(self.temp, 1, 100)
         if self.dodge >= self.temp:
             self.invincible += 1
@@ -946,18 +962,19 @@ def doFinalDMG():
                         times(self, 2, 10, 5)
                         title(self, f"#aqua#<<                    >>")
                         subtitle(self, "")
-                    self.shields = 0
-                    # Set Invcilibabiltiy
-                    # However, max 1s
-                    if self.sgduration > 20:
-                        self.sgduration = 20
+                        # Set Invcilibabiltiy
+                        # However, max 1s
+                        if self.sgduration > 20:
+                            self.sgduration = 20
 
-                    if entity(_player) and entity('@s[nbt={Inventory:[{Slot:14b, components:{"minecraft:custom_data":{ModID: "Catalyzing Shields"}}}]}]'):
-                        self.invincible = 12
-                    else:
-                        self.invincible = self.sgduration
-                        self.invincible += 1
-        
+                        if entity('@s[nbt={Inventory:[{Slot:14b, components:{"minecraft:custom_data":{ModID: "Catalyzing Shields"}}}]}]'):
+                            self.invincible = 12
+                        else:
+                            self.invincible = self.sgduration
+                                                    
+                    self.invincible += 1
+                    self.shields = 0
+
         # DO HEALTH DMG
         else:
             # Evoker: +1000% health DMG
@@ -983,8 +1000,6 @@ def doFinalDMG():
                 times(self, 2, 5, 5)
                 title(self, f"#red#<<                    >>")
                 subtitle(self, "") 
-
-
 
         if self.health <= 0:
             dokill()
@@ -1085,28 +1100,30 @@ def showhp():
         self.healthpct = 0
     self.shieldpct = 100 * self.shields / self.max_shields
 
-    if self.invincible > 0:
-        dninv(self.level, self.healthpct, self.shieldpct)
-    else:
-        # Health color changes based on defense
-        # <50 (Low): Red
-        # <100       
-        healthcolor = "#ff0000"
 
-        # If it is not set,
-        if not self.tempdefense >= -250:
-            defcalc()
+    # Health color changes based on defense
+    # <50 (Low): Red
+    # <100       
+    healthcolor = "#ff0000"
 
-        if self.tempdefense >= 1:
-            healthcolor = "red"
-        if self.tempdefense >= 500:
-            healthcolor = "#ff6600"
-        if self.tempdefense >= 1000:
-            healthcolor = "#ff9900"
-        if self.tempdefense >= 2000:
-            healthcolor = "#ffcc00"
+    # If it is not set,
+    if not self.tempdefense >= -250:
+        defcalc()
 
-        displayname(self.level, self.healthpct, self.shieldpct, healthcolor)
+    if self.tempdefense >= 1:
+        healthcolor = "red"
+    if self.tempdefense >= 500:
+        healthcolor = "#ff6600"
+    if self.tempdefense >= 1000:
+        healthcolor = "#ff9900"
+    if self.tempdefense >= 2000:
+        healthcolor = "#ffcc00"
+
+    displayname(self.level, self.healthpct, self.shieldpct, healthcolor)
+
+def ondeath():
+    if started == 1 and self.floor != 0:
+        gamemode(self, spectator)
 
 def doReactionDMG():
     # Blaze: 50% reduction
@@ -1325,9 +1342,6 @@ def calcPlayerWeaponDamage():
 def displayname(level: int, healthpct: int, shieldpct: int, healthcolor: int):
     # run(f'data modify entity @s CustomName set value [{{"text":"⭐{level}","color":"yellow"}},{{"color":"gray","text":" | "}},{{"color":"{healthcolor}","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"blue","text":"⛊{shieldpct}%"}}]')
     run(f'data merge entity @s {{CustomNameVisible:1b, CustomName: [{{"text":"⭐{level}","color":"yellow"}},{{"color":"gray","text":" | "}},{{"color":"{healthcolor}","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"blue","text":"⛊{shieldpct}%"}}]}}')
-
-def dninv(level: int, healthpct: int, shieldpct: int):
-    run(f'data merge entity @s {{CustomNameVisible:1b, CustomName: [{{"text":"⭐{level}","color":"yellow"}},{{"color":"gray","text":" | "}},{{"color":"dark_gray","text":"♥{healthpct}%"}},{{"color":"gray","text":" | "}},{{"color":"dark_gray","text":"⛊{shieldpct}%"}}]}}')
 
 def applyElectrified():
     self.electrified += 4
@@ -1867,7 +1881,7 @@ def onnewentity():
 
     # Level system! Increase base stats per level
     self.level = level
-    self.increase = (35 + self.level * self.level + (8 * self.level))
+    self.increase = (35 + self.level * self.level + (7 * self.level))
 
     # Damage Attenuation
     if self.da.a > 0:
@@ -1927,6 +1941,7 @@ def onnewjoin():
     self.takeem = 5
 
     attribute(self, max_health, 6)
+    attribute(self, knockback_resistance, 0.75)
     onrespawn()
 
 def playertick():
@@ -2134,8 +2149,6 @@ def applystats(lvl1: int, lvl2: int, lvl3: int):
     run('data modify entity @s PickupDelay set value 0')
     removetag(self, 'relicNotDone')
 def applyartistats(lvl1: int, lvl2: int, lvl3: int, lvl4: int, lvl5: int):
-    # selector: relic
-    randint(self.times, 3, 4)
     for i in range(self.times):
         # Random Stat
         if self.dtemp == 1:
@@ -2168,9 +2181,9 @@ def applyartistats(lvl1: int, lvl2: int, lvl3: int, lvl4: int, lvl5: int):
             run(f'scoreboard players add @s temp {lvl2}')
             run('execute store result entity @s Item.components."minecraft:custom_data".R-HPRegen int 1 run scoreboard players get @s temp')
         elif self.stat == 5:
-            run(f'data modify entity @s Item.components."minecraft:lore" append value {{"color": "aqua", "text": "  +{lvl2}0% Shield Recharge", "italic": false}}')
+            run(f'data modify entity @s Item.components."minecraft:lore" append value {{"color": "aqua", "text": "  +{lvl3}0% Shield Recharge", "italic": false}}')
             store('self.temp', getdata(self, 'Item.components."minecraft:custom_data".R-ShieldRegen'))
-            run(f'scoreboard players add @s temp {lvl2}0')
+            run(f'scoreboard players add @s temp {lvl3}0')
             run('execute store result entity @s Item.components."minecraft:custom_data".R-ShieldRegen int 1 run scoreboard players get @s temp')
         elif self.stat == 6:
             run(f'data modify entity @s Item.components."minecraft:lore" append value {{"color": "aqua", "text": "  +{lvl4}% Dodge Chance", "italic": false}}')
@@ -2430,19 +2443,28 @@ def diamondrelic():
 def bronzeartifact():
     run('summon item ~ ~ ~ {Tags:[artifactNotDone],PickupDelay:100,Item:{id:"minecraft:white_tulip",count:1,components:{"minecraft:custom_data":{Artifact:1},"minecraft:item_name":[{"text":"White Flower","italic":false}],"minecraft:lore":[{"color":"light_purple","text":"Flower Stats:", "italic": false}]}}}')
     run('data merge storage kcf:functionargs {lvl1: "0.2", lvl2: 1, lvl3: 2, lvl4: 5, lvl5: "0.05"}')
-    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 4, 5), applyartistats()))
+    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 3, 4), applyartistats()))
 def silverartifact():
     run('summon item ~ ~ ~ {Tags:[artifactNotDone],PickupDelay:100,Item:{id:"minecraft:orange_tulip",count:1,components:{"minecraft:custom_data":{Artifact:1},"minecraft:item_name":[{"text":"Orange Flower","italic":false}],"minecraft:lore":[{"color":"light_purple","text":"Flower Stats:", "italic": false}]}}}')
     run('data merge storage kcf:functionargs {lvl1: "0.4", lvl2: 2, lvl3: 3, lvl4: 10, lvl5: "0.1"}')
-    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 4, 5), applyartistats()))
+    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 3, 4), applyartistats()))
 def goldartifact():
     run('summon item ~ ~ ~ {Tags:[artifactNotDone],PickupDelay:100,Item:{id:"minecraft:red_tulip",count:1,components:{"minecraft:custom_data":{Artifact:1},"minecraft:item_name":[{"text":"Red Flower","italic":false}],"minecraft:lore":[{"color":"light_purple","text":"Flower Stats:", "italic": false}]}}}')
     run('data merge storage kcf:functionargs {lvl1: "0.6", lvl2: 3, lvl3: 6, lvl4: 15, lvl5: "0.15"}')
-    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 4, 5), applyartistats()))
+    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 3, 4), applyartistats()))
 def diamondartifact():
     run('summon item ~ ~ ~ {Tags:[artifactNotDone],PickupDelay:100,Item:{id:"minecraft:pink_tulip",count:1,components:{"minecraft:custom_data":{Artifact:1},"minecraft:item_name":[{"text":"Purple Flower","italic":false}],"minecraft:lore":[{"color":"light_purple","text":"Flower Stats:", "italic": false}]}}}')
     run('data merge storage kcf:functionargs {lvl1: "0.8", lvl2: 4, lvl3: 8, lvl4: 20, lvl5: "0.2"}')
-    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 4, 5), applyartistats()))
+    execute('as @n[type=item,tag=artifactNotDone]', (randint(self.times, 3, 4), applyartistats()))
+
+def opartifact():
+    run('summon item ~ ~ ~ {Tags:[artifactNotDone],PickupDelay:100,Item:{id:"minecraft:pink_tulip",count:1,components:{"minecraft:custom_data":{Artifact:1},"minecraft:item_name":[{"text":"OP Flower","italic":false}],"minecraft:lore":[{"color":"light_purple","text":"Flower Stats:", "italic": false}]}}}')
+    run('data merge storage kcf:functionargs {lvl1: "0.8", lvl2: 4, lvl3: 8, lvl4: 20, lvl5: "0.2"}')
+    execute('as @n[type=item,tag=artifactNotDone]', (set(self.times, 10), applyartistats()))
+def extraopartifact():
+    run('summon item ~ ~ ~ {Tags:[artifactNotDone],PickupDelay:100,Item:{id:"minecraft:pink_tulip",count:1,components:{"minecraft:custom_data":{Artifact:1},"minecraft:item_name":[{"text":"OP Flower","italic":false}],"minecraft:lore":[{"color":"light_purple","text":"Flower Stats:", "italic": false}]}}}')
+    run('data merge storage kcf:functionargs {lvl1: "0.8", lvl2: 4, lvl3: 8, lvl4: 20, lvl5: "0.2"}')
+    execute('as @n[type=item,tag=artifactNotDone]', (set(self.times, 50), applyartistats()))
 
 def givecmod(name: str, slot: int, desc: str):
     run(f'give @s blade_pottery_sherd[custom_data={{Mod:1,ModSlot:{slot},ModID:"{name}"}},custom_name=[{{"text":"[MOD] {name}","italic":false}}],lore=[[{{"text":"When this mod is activated:","italic":false,"color":"gray"}}],[{{"text":"{desc}","italic":false,"color":"gray"}}],"",[{{"text":"Fits in: Mod Slot {slot}","italic":false,"color":"dark_gray"}}]],enchantment_glint_override=true]')
@@ -2492,6 +2514,10 @@ def raremod():
 def tick():
     execute('as @e[tag=!notmob] at @s', genericEntityTick)
     execute('as @e[type=text_display,tag=dmgtext]', dmgtextanimation)
+    execute('as @e[type=interaction,tag=joinmsg] if data entity @s interaction on target', (
+        run('trigger start'),
+        run('data remove entity @n[type=interaction,tag=joinmsg] interaction')
+    ))
     execute('as @e[tag=ww] at @s', ww)
 
     # Bossbar
@@ -2520,7 +2546,7 @@ shopphase2: int
 def shopphase():
     run('bossbar set timer visible false')
 
-    kill('@e[type=!player,type=!item,tag=!notmob]')
+    kill('@e[type=!player,type=!item,tag=!notmob,tag=!important]')
 
     if failed != 1:
         temp = 4 + level
@@ -2721,10 +2747,13 @@ def stop():
     started = 0
     waiting = 0
     all.floor = 0
-    kill('@e[type=!player]')
+    kill('@e[type=!player,tag=!important]')
     kill('@e[type=item]')
     run('scoreboard objectives remove coins')
     run('bossbar set timer visible false')
+
+    gamemode(all, adventure)
+    tp(all, '8 4 8')
 
 def start():
     spawnArena()
@@ -2732,13 +2761,10 @@ def start():
 
 def resetself():
     self.coins = 100
-    self.shields = 500
-    self.max_shields = 500
+
     self.defense = 200
     run('clear @s')
 
-    self.max_health = 500
-    self.health = 500
     run('xp set @s 0 levels')
     run('xp set @s 0')
     self.cscounter = 0
@@ -2746,9 +2772,11 @@ def resetself():
     removeStatuses()
     tickmodifiers()
 
+    self.health = 500
+    self.shields = 500
 
 def start2():
-    kill('@e[type=!player]')
+    kill('@e[type=!player,tag=!important]')
     kill('@e[type=item]')
     level = 0
     started = 1
@@ -2768,8 +2796,7 @@ def start2():
     newfloor()
     gamemode(all, adventure)
     run('clear @a')
-    # run('give @a stone_sword[lore=[[{"text":"This sword is a tradiational sword.","italic":false,"color":"red"}],[{"text":"It is not affected by any damage stats.","italic":false,"color":"red"}]],unbreakable={}]')
-    execute('as @a at @s', giverandomstarting)
+
     def giverandomstarting():
         randint(self.temp, 1, 5)
         if self.temp == 1: giveweapon({"ID": '"stonesword_fire"'})
@@ -2782,9 +2809,10 @@ def start2():
     effect(all, saturation, 1, 14)
     give(all, carrot, 48)
     
-
     execute('as @a', resetself)
     execute('as @a', tickmodifiers)
+
+    wait('1t', execute('as @a at @s', giverandomstarting))
 
 def newfloor():
     timeleft = 1800
@@ -2801,16 +2829,13 @@ def newfloor():
 
     arenaNumOfPlayers = 0
     execute('positioned 8 -60 8 as @a[distance=..24]', add(arenaNumOfPlayers, 1))
-    print(f"Found {arenaNumOfPlayers} player")
 
     # Hard difficulty: 2x mobs
     if difficulty == 3: 
         arenaNumOfPlayers *= 2
-        print(f"Doubling... now {arenaNumOfPlayers}")
 
     # mobs
     for j in range(arenaNumOfPlayers):
-        print(f'Running Loop no. {j}/{arenaNumOfPlayers} Times')
         if level < 50:
             if level == 1:
                 summon(zombie, '0 100 0', {'Tags': '[spawnNotDone]'})
@@ -2966,7 +2991,28 @@ def onrespawn():
 
     self.invincible = 100
     effect(self, resistance, 'infinite', 4, True)
+    effect(self, saturation, 'infinite', 0, True)
 
     # Remove statuses
     removeStatuses()
 
+
+'''
+// Add damage CD bypasses
+# damage_type_tag minecraft:bypasses_cooldown
+{
+    "values": [
+        "minecraft:mob_attack",
+        "minecraft:magic",
+        "minecraft:indirect_magic",
+        "minecraft:arrow",
+        "minecraft:outside_border",
+        "minecraft:out_of_world",
+        "minecraft:explosion",
+        "minecraft:dragon_breath",
+        "minecraft:mob_projectile",
+        "minecraft:lightning_bolt",
+        "minecraft:player_attack"
+    ]
+}
+'''

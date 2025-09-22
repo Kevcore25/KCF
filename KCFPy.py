@@ -3,11 +3,20 @@ import ast, json, os, re
 # Version stuff
 VERSION = 5.0
 VERSION_HIGHLIGHTS = """
-NOTE: This is a development version of 5.0!
+* This program is rebranding! It will now use "PyMCF" as it makes more sense rather than "KCF" which is more of a personal name
+* Fixed many bugs
+* Added custom file additions to the datapack
+* If statements can use 1 < x < 3 as: execute if score #global x matches 1..3
+* Many more QoL features
+* Build/Writing files is now a built-in function 
 """
 
+PACK_VERSION = 80
+
 # Turn debug mode on or off
-debug = False
+# Debug mode prints various AST and internal variable information
+# For larger projects, this should be off or it will slow down the build process
+DEBUG = True
 
 colors = {
     'red':'red',
@@ -207,7 +216,7 @@ def convert_binop(binop_node, temp_name, tempi = 0):
                 ast.AugAssign(target=temp_store, op=binop_node.op, value=operand)
             )
 
-    if debug:
+    if DEBUG:
         for i in statements:
             print('binop', ast.dump(i))
 
@@ -227,6 +236,9 @@ class KCF:
         self.namespace = 'kcf'
 
         self.warnings = []
+
+        self.extraFiles: dict[str, str] = {}
+        self.extraFileNames = {}
 
         # PRESET CODE
         self.files = {
@@ -297,7 +309,7 @@ class KCF:
         Dict and list are returned as String.
         """
 
-        if debug:
+        if DEBUG:
             print('val', ast.dump(value))
 
         # Return constant
@@ -352,7 +364,7 @@ class KCF:
             elif isinstance(key, ast.Constant):
                 new[key.value] = val
 
-        if debug: print(new)
+        if DEBUG: print(new)
         return new
 
     def fstring(self, text: ast.JoinedStr | ast.Constant) -> str:
@@ -699,16 +711,16 @@ class KCF:
                         if val in self.variables:
                             if isinstance(self.variables[val], str) and self.variables[val] == 'dummy':
                                 entity, varName = self.parse_var(arg)
-                                result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
+                                result.append(f"execute store result storage {self.namespace}:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
                             else:
-                                result.append(f"data modify storage kcf:functionargs {val} set from storage kcf:vars {val}")
+                                result.append(f"data modify storage {self.namespace}:functionargs {val} set from storage {self.namespace}:vars {val}")
 
                         elif isinstance(arg, ast.Constant):
                             self.raise_error(filename, "Argument cannot be a pre-defined value. It must be a variable, or be set to a single DICT type", [arg.value, cmd], 2)
 
                         else:
                             entity, varName = self.parse_var(arg)
-                            result.append(f"execute store result storage kcf:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
+                            result.append(f"execute store result storage {self.namespace}:functionargs {varName} int 1 run scoreboard players get {entity} {varName}")
 
                     result.append(f'function {self.namespace}:{cmd.lower()} with storage {self.namespace}:functionargs')
 
@@ -879,12 +891,29 @@ class KCF:
                     for v in value.values:
                         cmpre(v, opp)
                 elif isinstance(value.op, ast.Or):
-                    temp += 'run '
-                    t = []
-                    for v in value.values:
-                        t.append(self.parse_condition(v, opp=opp))
-                    temp += f'\n{temp}'.join(t)
+                    # Plan: 
+                    # Iterate through the list values=[Name, Name, etc]
+                    # At I, opp is CURRENT but opp is NOT CURRENT for others
                     add = False
+                    cmds = []
+                    for i in range(len(value.values)):
+                        temp = ''
+                        for j in range(len(value.values)):
+                            cmpre(value.values[j], opp = (opp if i == j else not opp))
+
+                        cmds.append(
+                            starting + temp + '%end%'
+                        )
+                    
+                    temp = '\n'.join(cmds)
+
+
+                    """
+            BoolOp(op=Or(), values=[
+                Name(id='a', ctx=Load()), 
+                Name(id='b', ctx=Load())
+            ]),
+                    """
             elif isinstance(value, ast.Constant):
                 if isinstance(value.value, str):
                     temp += f"{y} {value.value} "
@@ -958,8 +987,19 @@ class KCF:
                 self.files[filename] += "\n" + data
 
     def print(self):
-        for file in self.files:
-            print(f"\nIN FILE {file}.mcfunction:\n" + self.files[file])
+        """
+        Prints the files that should be created by the wrapper.
+
+        The format should follow the [datapack assembler](https://far.ddns.me/) format and you can directly paste it in there if you do not wish to use the write_files function.
+        """
+
+        # Note that for the datapack assembler, it auto does load/tick functions into the minecraft tags folder
+
+        for file, content in self.files.items():
+            print(f"\n# function {self.namespace}:{file}\n{content}")
+        
+        for file, path in self.extraFileNames.items():
+            print(f"\n{file}\n{self.extraFiles[path]}")
 
     def inverse_parse_var(self, var: str):
         """
@@ -1090,11 +1130,11 @@ class KCF:
         temp = []
         if isinstance(expression.value, ast.Dict):
             for var in expression.targets:
-                temp.append(f"data modify storage kcf:vars {self.parse_var_only(var)} set value {self.parse_dict(expression.value)}")
+                temp.append(f"data modify storage {self.namespace}:vars {self.parse_var_only(var)} set value {self.parse_dict(expression.value)}")
 
         elif isinstance(expression.value, ast.List):
             for var in expression.targets:
-                temp.append(f"data modify storage kcf:vars {self.parse_var_only(var)} set value {self.parse_list(expression.value)}")
+                temp.append(f"data modify storage {self.namespace}:vars {self.parse_var_only(var)} set value {self.parse_list(expression.value)}")
 
         elif isinstance(expression.value, ast.Constant) or isinstance(expression.value, ast.UnaryOp):
             # Must be var, so
@@ -1129,7 +1169,7 @@ class KCF:
                             else:
                                 parsedValue = value
 
-                            temp.append(f"data modify storage kcf:vars {var} set value {parsedValue}")
+                            temp.append(f"data modify storage {self.namespace}:vars {var} set value {parsedValue}")
                         else:
                             self.raise_error(None, f"Variable '{var}' is not a valid type! It is neither a scoreboard (int) or a storage (str, dict, float, bool)", ast.unparse(value), 2)
                         
@@ -1310,7 +1350,7 @@ class KCF:
         cmds = []
 
         for expression in parsed:
-            if debug: print(ast.dump(expression))
+            if DEBUG: print(ast.dump(expression))
 
             if isinstance(expression, ast.FunctionDef):
                 self.write(expression.name, self.parse(expression.body, expression.name.lower()))
@@ -1343,16 +1383,23 @@ class KCF:
                             case "run":
                                 # If F string
                                 if isinstance(args[0], ast.JoinedStr):
-                                    temp = ""
-                                    for v in args[0].values:
-                                        if isinstance(v, ast.Constant):
-                                            temp += v.value
-                                        elif isinstance(v, ast.FormattedValue):
-                                            temp += f"$({v.value.id})"
+                                    # Prevent accidential use of F string, which will actually give an error
+                                    # This specific case checks for run(f"something")
+                                    if len(args[0].values) == 1 and isinstance(args[0].values[0], ast.Constant) and isinstance(args[0].values[0].value, str):
+                                        self.raise_warning(filename, "Macro type run function does not contain a macro! It will be converted into a non-macro expression.", args[0].values[0].value)
+                                        cmds.append(args[0].values[0].value)
 
-                                    temp = '$' + temp
+                                    else:
+                                        temp = ""
+                                        for v in args[0].values:
+                                            if isinstance(v, ast.Constant):
+                                                temp += v.value
+                                            elif isinstance(v, ast.FormattedValue):
+                                                temp += f"$({v.value.id})"
 
-                                    cmds.append(temp)
+                                        temp = '$' + temp
+
+                                        cmds.append(temp)
     
                                 else:
                                     cmds.append(args[0].value)
@@ -1376,13 +1423,122 @@ class KCF:
                 # IF
                 elif isinstance(expression.value, ast.IfExp):
                     cmds.append(self.ifexpr(expression.value, filename))
+                elif isinstance(expression.value, ast.Constant) and isinstance(expression.value.value, str):
+                    # KCFPy (Or now known as PyMCF in 5.0) now accepts custom files in the build dir
+                    # They all start with @ and the EOF is upon either: end of str OR new @
+                    # When starting with a @, the next is the build location.
+                    # E.g.: @ function/myfunc.mcfunction
+                    # By default, the path is root/data/namespace/...; however, if a / (root) is specified, the path is root/...
+                    # To ensure basic safety, .. is disabled. It must be an absolute path (relative to the root dir)
+
+                    # When making datapack-related tags/json files, try not to use the @ (direct file) method.
+                    # Instead, use the datapack method below:
+
+                    # PyMCF will also use a simple conventional format like so:
+                        # damage_type_tag minecraft:bypasses_cooldown
+                    # See below for more details. Only function files and JSON files are supported. Others (e.g. worldgen and structure) are not supported yet.
+                    # By using @, the print function fails to print these custom files
+
+                    # Creating files is later. This only gets the contents and the path
+                    string = expression.value.value
+
+                    lines = string.strip().splitlines()
+
+                    path = None
+                    contents = []
+
+                    for ln in lines:
+                        ln = ln.rstrip()
+
+                        if ln.startswith('//'): continue
+
+                        # There are actually 2 ways of making the path.
+                        # One is the KCF way, where you specify the path: @ /minecraft/tags/damage_type/bypasses_cooldown.json
+                        # This is more precise and mainly used for adding specific files (e.g. .txt files). For adding datapack related files, try using the conventional way before this 
+                            # Other examples: 
+                                # @ function/hello.mcfunction
+                                # @ function/script.py      <-- Will cause a WARNING in your server log files due to it not being a .mcfunction - this can safely be ignored
+                        # Another is a more conventional way, where you specify a location and its namespace: # function kcf:abc
+                        # This is for datapack related files and more easier/safer to use
+                            # Other examples:
+                                # # damage_type_tag minecraft:bypasses_cooldown
+                            # Note that in KCF, you can instead use @ for the namespace like so: # function @:abc
+
+                        # The conventional way uses the # symbol - note that it must have the basic requirement (content namespace:file)
+                        # It will be printed in the print function
+                        if (
+                            ln.startswith('# ') and len(ln) > 2 and len(ln[2:].lower().split(' ')) == 2 and ln[2:].lower().split(' ')[1].count(':') == 1
+                        ) or ln.strip().lower() == '# end':
+                            # Perform check
+                            try:
+                                format, file = ln[2:].lower().split(' ')
+
+                                
+                                # Check if it is a valid format, as of 1.21.8 
+                                if (
+                                    format.endswith('_tag') and format[:-4] not in ('function', 'block', 'item', 'fluid', 'entity_type', 'game_event', 'biome', 'flat_level_generator_preset', 'world_preset', 'structure', 'cat_variant', 'point_of_interest_type', 'painting_variant', 'banner_pattern', 'instrument', 'damage_type', 'enchantment', 'dialog', 'worldgen')
+                                ) or (
+                                    not format.endswith('_tag') and format not in ('function', 'structure', 'advancement', 'banner_pattern', 'cat_variant', 'chat_type', 'chicken_variant', 'cow_variant', 'damage_type', 'dialog', 'dimension', 'dimension_type', 'enchantment', 'enchantment_provider', 'frog_variant', 'instrument', 'item_modifier', 'jukebox_song', 'loot_table', 'painting_variant', 'pig_variant', 'predicate', 'recipe', 'test_environment', 'test_instance', 'trial_spawner', 'trim_material', 'trim_pattern', 'wolf_sound_variant', 'wolf_variant')
+                                ):
+                                    self.raise_warning(filename, f"Custom '{format}' file is likely a non-vanilla location/content and may not work", ln)
+                                
+                                if format == "function":
+                                    ext = '.mcfunction'
+                                elif format == "structure":
+                                    self.raise_warning(filename, "The structure format is a planned feature although not yet implemented. In the future, you will be able to specify a path on your drive to copy it into the structure folder.", ln)
+                                    continue
+                                else:
+                                    # Assume all other files are JSON files
+                                    # In https://minecraft.wiki/w/Data_pack, the wiki shows only 2 types that do not use .json: function (.mcfunction), structure (.nbt)
+                                    ext = '.json'
+
+                                # Get Namespace
+                                ns, f = file.split(':')
+                                if ns == '@': 
+                                    ns = self.namespace
+
+                                # Add to extras
+                                if path is not None:
+                                    self.extraFiles[path] = '\n'.join(contents).strip('\n')
+
+                                # If _tag is specified then it should be in the TAGS folder
+                                if format.endswith('_tag'):
+                                    path = f"/{ns}/tags/{format[:-4]}/{f}{ext}"
+                                else:
+                                    path = f"/{ns}/{format}/{f}{ext}"
+
+                                contents = []
+
+                                # Note that the program essentially convert it on the spot so the write_files does it automatically
+                                # However, it will use a seperate DICT to make it easier for the print function
+                                self.extraFileNames[ln] = path # Redirects into self.extraFiles to conserve memory. It may be possible to directly redirect (self.extraFileNames[ln] = self.extraFiles[path]) due to Python's copy nature but I haven't tested it yet
+                                # If only you can partically use C here and use pointers/mem addresses...
+
+                            except ValueError: 
+                                continue
+                        
+                        # Direct file way
+                        elif ln.startswith('@ '):  # new file block
+                            if path is not None:
+                                self.extraFiles[path] = '\n'.join(contents).strip('\n')
+                            
+                            # Get path
+                            path = ln[2:].strip()
+
+                            contents = []
+                        else:
+                            contents.append(ln)
+
+                    # Add the last block if any
+                    if path is not None:
+                        self.extraFiles[path] = '\n'.join(contents).strip('\n')
                 else:
-                    if not (isinstance(expression.value, ast.Constant) and isinstance(expression.value.value, str)):
-                        self.raise_warning(filename, f"Expression '{ast.unparse(expression)}' is skipped.", ast.unparse(expression))
+                    self.raise_warning(filename, f"Expression '{ast.unparse(expression)}' is skipped.", ast.unparse(expression))
             elif isinstance(expression, ast.If):
                 cmds.append(self.ifexpr(expression, filename))
             elif isinstance(expression, ast.While):
                 # NOTICE: WHILE..ELSE does NOT WORK, and will NOT be planned to be made anytime soon
+                # Short Explanation: There is no BREAK keyword in KCF/PyMCF therefore there is no need of a WHILE..ELSE
 
                 # In a while loop, do this:
                 # function kcf:file_while0
@@ -1482,9 +1638,9 @@ class KCF:
         Error level specifies the level of error occurred.
         1. Not extreme but may cause some issues and should be avoided
         2. May break code and should be avoided
-        3. Will break code
-        4. Will break code definitely
-        5. Extreme disallowed.
+        3. Will likely break the code
+        4. Will definitely break the code
+        5. Extremely disallowed.
 
         Therefore if the ERROR_THRESHOLD is set to 5+, all custom errors are ignored
         """    
@@ -1624,10 +1780,62 @@ class KCF:
         print(f"Characters Saved: {totalChar - nowchar} ({nowchar} chars in code compared to {totalChar} chars in MCF)")
         print(f"Lines Saved: {lns - nowlns} ({nowlns} lines in code compared to {lns} lines in MCF)")
 
-    def write_files(self, destination: str = "."):
+    def write_files(self, name: str = ".", description: str = "Made with PyMCF"):
+        def mkfile(file: str, value: str = ""):
+            with open(file, "w") as f:
+                f.write(value)
+
+        def mkdir(path: str):
+            if not os.path.isdir(path):
+                os.mkdir(path)
+
+
+        mkdir(name)
+        mkdir(os.path.join(name, "data"))
+        mkfile(os.path.join(name, "pack.mcmeta"), json.dumps({
+            "pack": {
+                "pack_format": PACK_VERSION,
+                "description": description
+            }
+        }, indent=4))
+
+        mkdir(os.path.join(name, "data", self.namespace))
+        mkdir(os.path.join(name, "data", self.namespace, "function"))
+
+        mkdir(os.path.join(name, "data", "minecraft"))
+        mkdir(os.path.join(name, "data", "minecraft", "tags"))
+        mkdir(os.path.join(name, "data", "minecraft", "tags", "function"))
+        mkfile(os.path.join(name, "data", "minecraft", "tags", "function", "load.json"), json.dumps({
+            "values": [
+                f"{self.namespace}:load"
+            ]
+        }))
+        mkfile(os.path.join(name, "data", "minecraft", "tags", "function", "tick.json"), json.dumps({
+            "values": [
+                f"{self.namespace}:tick"
+            ]
+        }))
+
+        for abspath, contents in self.extraFiles.items():
+            # Remove ..
+            abspath = abspath.replace('..', '')
+
+            # Path starts with root: root is data
+            if abspath.startswith('/'):
+                path = os.path.join(name, "data", *abspath.split('/'))
+                os.makedirs(os.path.join(name, "data", *abspath.split('/')[:-1]), exist_ok=True)
+            else:
+                path = os.path.join(name, "data", self.namespace, *abspath.split('/'))
+                os.makedirs(os.path.join(name, "data", self.namespace, *abspath.split('/')[:-1]), exist_ok=True)
+
+            mkfile(path, contents)
+
+        # Write
+        dest = os.path.join(name, "data", self.namespace, "function")
+
         for file, contents in self.files.items():
             files = file.split('/')
-            if not os.path.isdir(os.path.join(destination, *files[:-1])):
-                os.mkdir(os.path.join(destination, *files[:-1]))
-            with open(os.path.join(destination, *files[:-1], files[-1] + ".mcfunction"), 'w', encoding='utf-8') as f:
+            if not os.path.isdir(os.path.join(dest, *files[:-1])):
+                os.mkdir(os.path.join(dest, *files[:-1]))
+            with open(os.path.join(dest, *files[:-1], files[-1] + ".mcfunction"), 'w', encoding='utf-8') as f:
                 f.write(contents)

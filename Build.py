@@ -12,9 +12,6 @@ PACK_VERSION = 80 # 71 is 1.21.5
 
 import json, KCFPy
 import shutil, os
-import zipfile
-import tempfile
-
 
 # Welcome message
 print('\n' + '=' * os.get_terminal_size()[0] + "\n")
@@ -84,56 +81,10 @@ else:
     if os.path.isdir(name):
         shutil.rmtree(name, ignore_errors=True)
 
-mkdir(name)
-mkdir(join(name, "data"))
-mkfile(join(name, "pack.mcmeta"), json.dumps({
-    "pack": {
-        "pack_format": PACK_VERSION,
-        "description": description
-    }
-}, indent=4))
-
-mkdir(join(name, "data", namespace))
-mkdir(join(name, "data", namespace, "function"))
-
-mkdir(join(name, "data", "minecraft"))
-mkdir(join(name, "data", "minecraft", "tags"))
-mkdir(join(name, "data", "minecraft", "tags", "function"))
-mkdir(join(name, "data", "minecraft", "tags", "damage_type"))
-
-mkfile(join(name, "data", "minecraft", "tags", "damage_type", "bypasses_cooldown.json"), json.dumps({
-    "values": [
-            "minecraft:mob_attack",
-            "minecraft:magic",
-            "minecraft:indirect_magic",
-            "minecraft:arrow",
-            "minecraft:outside_border",
-            "minecraft:out_of_world",
-            "minecraft:explosion",
-            "minecraft:dragon_breath",
-            "minecraft:mob_projectile",
-            "minecraft:lightning_bolt",
-            "minecraft:player_attack"
-    ]
-}))
-mkfile(join(name, "data", "minecraft", "tags", "function", "load.json"), json.dumps({
-    "values": [
-        f"{namespace}:load"
-    ]
-}))
-mkfile(join(name, "data", "minecraft", "tags", "function", "tick.json"), json.dumps({
-    "values": [
-        f"{namespace}:tick"
-    ]
-}))
-
-
 # Write
 print("Writing code...")
 
-dest = join(name, "data", namespace, "function")
-
-t.write_files(dest)
+t.write_files(name)
 
 if zipison:
     # Zip fi1le
@@ -151,6 +102,6 @@ if zipison:
 
 # print("Done!")
 # input("Press enter to continue...\t")
-# t.print()
+t.print()
 t.print_stats()
 t.print_warnings()
