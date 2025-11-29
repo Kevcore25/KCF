@@ -132,7 +132,7 @@ def tick():
   "key": {
     "X": [
       "minecraft:wither_skeleton_skull",
-      "minecraft:ominous_trial_key",
+      "minecraft:heavy_core",
       "minecraft:elytra",
       "minecraft:piglin_head"
     ],

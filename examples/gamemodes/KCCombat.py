@@ -266,21 +266,21 @@ def spawnArena():
     run('fill -9 7 -9 25 7 25 air')
 
     # Now add some grass!
-    for i in range(16):
-        summon(pig, '~ ~ ~', {'Tags': '[arenagrass]'})
+    # for i in range(16):
+    #     summon(pig, '~ ~ ~', {'Tags': '[arenagrass]'})
     
-    run('spreadplayers 8 8 8 16 under -32 false @e[type=pig,tag=arenagrass]')
+    # run('spreadplayers 8 8 8 16 under -32 false @e[type=pig,tag=arenagrass]')
 
-    execute('at @e[type=pig,tag=arenagrass]', (
-        run('setblock ~ ~-2 ~ dispenser[facing=up,triggered=false]{Items:[{Slot:0b,id:"minecraft:bone_meal",count:1}]} replace'),
-        run('setblock ~ ~-3 ~ redstone_block')
-    ))
+    # execute('at @e[type=pig,tag=arenagrass]', (
+    #     run('setblock ~ ~-2 ~ dispenser[facing=up,triggered=false]{Items:[{Slot:0b,id:"minecraft:bone_meal",count:1}]} replace'),
+    #     run('setblock ~ ~-3 ~ redstone_block')
+    # ))
 
     def sacleanup():
         execute('at @e[type=pig, tag=arenagrass]', fill('~ ~-2 ~', '~ ~-3 ~', air))
         run('fill -8 3 24 24 3 -8 barrier')
-        tp('@e[type=pig, tag=arenagrass]', '0 -100 0')
-        kill('@e[type=pig, tag=arenagrass]')
+        # tp('@e[type=pig, tag=arenagrass]', '0 -100 0')
+        # kill('@e[type=pig, tag=arenagrass]')
         kill('@e[type=item]')
         run('fill 24 -62 24 -8 -62 -8 bedrock')
         createmsg()
@@ -308,7 +308,7 @@ def addshortweapon(ID, Cost, Item, Name, Description, DMG, CR, CD, ATKSPD, Statu
     run(f'data modify storage kcs:weapons {ID}.itemdata set value \'{{"id": "{Item}", "count": 1, "components":{{custom_name:[{{"text":"{Name}","italic":false}}],lore:[[{{"text":"{Description}","italic":false,"color":"gray"}}],"",[{{"text":"Base DMG: {DMG}","italic":false,"color":"gray"}}],[{{"text":"Base Status: {Status}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Chance: {CR}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Damage: {CD}%","italic":false,"color":"gray"}}],[{{"text":"Base Attack Speed: {ATKSPD}/s","italic":false,"color":"gray"}}]],custom_data:{{Root: "{Root}",DMG: {DMG}, CR: {CR}, CD: {CD}, ATKSPD: {ATKSPD}, Status: {Status}, Fire: {Fire}, Ice: {Ice}, Water: {Water}, Electric: {Electric}, Nature: {Nature}}},attribute_modifiers:[{{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{{type:"hidden"}},operation:add_value}},{{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{{type:"hidden"}},operation:add_value}},{{id:"weapon_short",type:"entity_interaction_range",amount:-0.5,operation:"add_multiplied_total",slot:"mainhand"}},{{type:attack_speed,amount:{ATKSPD},slot:mainhand,id:"weapon_atkspdmod",operation:add_value}}]}}}}\'')
     run(f'data modify storage kcs:weapons {ID}.shopdata set value {{"Cost": {Cost}, "Name": "{Name}", "ItemData": \'{{"action":"show_item", "id": "{Item}", "count": 1, "components":{{custom_name:[{{"text":"{Name}","italic":false}}],lore:[[{{"text":"{Description}","italic":false,"color":"gray"}}],"",[{{"text":"Base DMG: {DMG}","italic":false,"color":"gray"}}],[{{"text":"Base Status: {Status}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Chance: {CR}%","italic":false,"color":"gray"}}],[{{"text":"Base Critical Damage: {CD}%","italic":false,"color":"gray"}}],[{{"text":"Base Attack Speed: {ATKSPD}/s","italic":false,"color":"gray"}}]],custom_data:{{Root: "{Root}",DMG: {DMG}, CR: {CR}, CD: {CD}, ATKSPD: {ATKSPD}, Status: {Status}, Fire: {Fire}, Ice: {Ice}, Water: {Water}, Electric: {Electric}, Nature: {Nature}}},attribute_modifiers:[{{id:"weapon_short",type:"entity_interaction_range",amount:-0.5,operation:"add_multiplied_total",slot:"mainhand"}},{{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{{type:"hidden"}},operation:add_value}},{{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{{type:"hidden"}},operation:add_value}},{{type:attack_speed,amount:{ATKSPD},slot:mainhand,id:"weapon_atkspdmod",operation:add_value}}]}}}}\'}}')
 
-def addweapon(ID: str, ):
+def addweapon(ID: str):
     run(f'data modify storage kcf:functionargs Root set value "{ID}"')
     run('function kcf:addweapont with storage kcf:functionargs')
 
@@ -405,7 +405,7 @@ def compileweapons():
     })
     addstandardweapon({
         'ID': '"coppersword"', 'Cost': 75, 'NormalCost': 20,
-        'Item': '"wooden_sword"', 'Name': '"Copper Sword"',
+        'Item': '"copper_sword"', 'Name': '"Copper Sword"',
         "Description": '"A standard sword that is very conductive but lacks the standard damage output. The recommended elemental applier for beginners."',
         "DMG": 30, "CR": 15, "CD": 50,
         "Status": 75, "ATKSPD": 1.6
@@ -472,6 +472,8 @@ execute store result storage kcf:functionargs z float 0.1 run random value -6..6
 
 function kcf:displayreactionm with storage kcf:functionargs
     ''')
+    run('data modify storage kcf:functionargs Color set value "white"')
+
     textdisplays += 1
 
 def displaydmg(Symbol: str, takedmg: int, Color: str):
@@ -815,7 +817,7 @@ def calcCriticals():
                 self.bonuscd = 120
             self.tempcd += self.bonuscd
 
-        self.cd += self.cd * self.crittimes * self.tempcd / 100 
+        self.cd *= self.crittimes * (100 + self.tempcd) / 100 
         self.cd += 100
         tellraw(_debugger, f"#yellow#CRIT DMG Multiplier: {self.cd}x")
         # Assume, CD = 50%, statCD = 100%
@@ -864,9 +866,9 @@ def defcalc():
     if self.acidified > 0:
         self.tempdefense -= 35 * self.takeem
 
-    # Minimum -450
-    if self.tempdefense < -450:
-        self.tempdefense = -450
+    # Minimum -100
+    if self.tempdefense < -100:
+        self.tempdefense = -100
 
     # Reduction
     self.reduc = 50000 / (self.tempdefense + 500)
@@ -1133,6 +1135,8 @@ def doReactionDMG():
     if entity('@s[tag=gigantic]'):
         self.takedmg *= 2
 
+    tellraw(_debugger, f"#green#Final REACTION Calc DMG: {self.takedmg}")
+
     run('data modify storage kcf:functionargs Symbol set value "🧪"')
     doDMG()
 
@@ -1151,6 +1155,8 @@ def doPhysDMG():
         execute('at @s if entity @e[distance=..6,tag=gigantic]', multiply(self.takedmg, 2.5))
         execute('at @s if entity @e[distance=..12,tag=titan]', multiply(self.takedmg, 6))
 
+    tellraw(_debugger, f"#green#Final PHYS Calc DMG: {self.takedmg}")
+
     run('data modify storage kcf:functionargs Symbol set value "🗡"')
     doDMG()
 
@@ -1159,6 +1165,12 @@ def doFireDMG():
     self.fireS += 1
 
     if self.fireS > 10: self.fireS = 10
+
+    # DMG bonuses
+    self.takedmg *= (100 + self.take.fire)
+    self.takedmg /= 100
+
+    tellraw(_debugger, f"#green#FIRE Calc DMG: {self.takedmg}")
 
     # Skeleton/Husk: 50% reduction
     if entity('@s[type=skeleton]') or entity('@s[type=husk]'):
@@ -1184,6 +1196,12 @@ def doIceDMG():
     self.ice = 60
     self.iceS += 1
 
+    # DMG bonuses
+    self.takedmg *= (100 + self.take.ice)
+    self.takedmg /= 100
+
+    tellraw(_debugger, f"#green#ICE Calc DMG: {self.takedmg}")
+
     # Max 7 stacks
     if self.iceS > 7: self.iceS = 7
 
@@ -1205,6 +1223,13 @@ def waterburstdmg():
 def doWaterDMG():
     self.water = 60
     self.waterS += 1
+
+    # DMG bonuses
+    self.takedmg *= (100 + self.take.water)
+    self.takedmg /= 100
+
+    tellraw(_debugger, f"#green#WATER Calc DMG: {self.takedmg}")
+
 
     # Enderman/Blaze: 200% more
     if entity('@s[type=enderman]') or entity('@s[type=blaze]'):
@@ -1229,6 +1254,12 @@ def doElectricDMG():
     self.electric = 60
     self.electricS += 1
 
+    # DMG bonuses
+    self.takedmg *= (100 + self.take.electric)
+    self.takedmg /= 100
+
+    tellraw(_debugger, f"#green#ELECTRIC Calc DMG: {self.takedmg}")
+
     # Max 5 stacks
     if self.electricS > 5: 
         self.electricS = 5
@@ -1241,6 +1272,14 @@ def doElectricDMG():
 def doNatureDMG():
     self.nature = 60
     self.natureS += 1
+    
+    # DMG bonuses
+    self.takedmg *= (100 + self.take.nature)
+    self.takedmg /= 100
+
+    tellraw(_debugger, f"#green#NATURE Calc DMG: {self.takedmg}")
+
+
     run('data modify storage kcf:functionargs Symbol set value "🦠"')
     doDMG()
 
@@ -1291,35 +1330,24 @@ def calcPlayerWeaponDamage():
         self.rawdmg /= 10
 
     self.dmg = self.rawdmg
+    tellraw(_debugger, f"#aqua#\nInitial DMG: {self.dmg}")
 
     # Elements
     self.gotamt = 0
     store(self.gotfire, rollFire)
     if self.gotfire == 1: 
-        self.dmg *= (100 + self.stat.fire)
-        self.dmg /= 100
-
         self.gotamt += 1
     store(self.gotice, rollIce)
     if self.gotice == 1: 
-        self.dmg *= (100 + self.stat.ice)
-        self.dmg /= 100
         self.gotamt += 1
-
     store(self.gotwater, rollWater)
     if self.gotwater == 1: 
-        self.dmg *= (100 + self.stat.water)
-        self.dmg /= 100
         self.gotamt += 1
     store(self.gotelectric, rollElectric)
     if self.gotelectric == 1: 
-        self.dmg *= (100 + self.stat.electric) 
-        self.dmg /= 100
         self.gotamt += 1
     store(self.gotnature, rollNature)
     if self.gotnature == 1: 
-        self.dmg *= (100 + self.stat.nature)
-        self.dmg /= 100
         self.gotamt += 1
 
     # Apply criticals
@@ -1327,6 +1355,16 @@ def calcPlayerWeaponDamage():
 
     _damagedEntity.takedmg = self.dmg
     _damagedEntity.takeem = self.em
+
+    _damagedEntity.take.fire = self.stat.fire
+    _damagedEntity.take.ice = self.stat.ice
+    _damagedEntity.take.water = self.stat.water
+    _damagedEntity.take.electric = self.stat.electric
+    _damagedEntity.take.nature = self.stat.nature
+
+    _damagedEntity.take.level = self.lvl
+
+    tellraw(_debugger, f"#aqua#Final Weapon Calc DMG: {self.dmg}")
 
     if self.gotamt >= 1:
         if self.gotfire == 1: execute('as @n[nbt={HurtTime:10s},tag=!self]', doFireDMG)
@@ -1472,47 +1510,6 @@ def genericEntityTick():
         if not entity(_player):
             self.dmgtaken = 0
 
-    # Elements
-    if self.fire > 0:
-        self.fire -= 1
-
-        if self.fire <= 0:            
-            self.fireS -= 1
-            if self.fireS > 0:
-                self.fire = 10
-        run('particle minecraft:flame ~ ~0.6 ~ 0.2 0.3 0.2 0 5 normal @a')
-    if self.ice > 0:
-        self.ice -= 1
-        if self.ice <= 0:            
-            self.iceS -= 1
-            if self.iceS > 0:
-                self.ice = 10
-        run('particle minecraft:snowflake ~ ~1 ~ 0.2 0.1 0.2 0 5 normal @a')
-    if self.water > 0:
-        self.water -= 1
-        if self.water <= 0:
-            self.waterS -= 1
-            if self.waterS > 0:
-                self.water = 10
-
-        run('particle minecraft:block_crumble{block_state:"water"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
-    if self.electric > 0:
-        self.electric -= 1
-        if self.electric <= 0:             
-            self.electricS -= 1
-            if self.electricS > 0:
-                self.electric = 10
-
-        run('particle minecraft:electric_spark ~ ~1 ~ 0.2 0.1 0.2 0 5 normal @a')
-    if self.nature > 0:
-        self.nature -= 1
-        if self.nature <= 0: 
-            self.natureS -= 1
-            if self.natureS > 0:
-                self.nature = 10
-
-        run('particle minecraft:block_crumble{block_state:"oak_leaves"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
-
 
     # Reactions, in order
 
@@ -1615,15 +1612,25 @@ def genericEntityTick():
             self.electricS -= 1; self.waterS -= 1
 
         if self.waterS > 0 and self.natureS > 0:
-            # Acidify
-            self.acidified += 60
-            if self.acidified > 160: self.acidified = 160
+            # Bloom
 
-            # DMG
-            self.takedmg = 20 * self.takeem
-            doReactionDMG()
+            # Get amount of bloom cores
+            self.temp = 0
+            execute('at @e[type=slime,distance=..4,tag=bloomCore]', add(self.temp, 1))
+            if self.temp >= 4:
+                execute('as @e[type=slime,distance=..4,sort=random,limit=1,tag=bloomCore] at @s', explodeBloom)
 
-            displayreaction({"Name": '"🧪 Acidify"', "Color": '"green"'})
+            run('summon slime ~ ~ ~ {CustomNameVisible:1b,NoAI:1b,Health:1024f,Size:0,Tags:["bloomCore","notmob","notdone"],CustomName:"Bloom Core",attributes:[{id:"minecraft:max_health",base:1024}]}')
+
+            execute('at @s as @n[type=slime,tag=bloomCore,tag=notdone]', (
+                # Set own stats
+                set(self.em, nearest.takeem),
+                set(self.stat.nature, nearest.take.nature),
+                set(self.level, nearest.take.level),
+                removetag(self, 'notdone')
+            ))
+
+            displayreaction({"Name": '"🧪 Bloom"', "Color": '"green"'})
 
             # Remove a stack
             self.waterS -= 1; self.natureS -= 1
@@ -1653,6 +1660,48 @@ def genericEntityTick():
             displayreaction({"Name": '"🍾 Corrosion"', "Color": '"#014c00"'})
             # Remove all stacks
             self.natureS = 0; self.electricS = 0
+
+# Elements
+    if self.fire > 0:
+        self.fire -= 1
+
+        if self.fire <= 0:            
+            self.fireS -= 1
+            if self.fireS > 0:
+                self.fire = 10
+        run('particle minecraft:flame ~ ~0.6 ~ 0.2 0.3 0.2 0 5 normal @a')
+    if self.ice > 0:
+        self.ice -= 1
+        if self.ice <= 0:            
+            self.iceS -= 1
+            if self.iceS > 0:
+                self.ice = 10
+        run('particle minecraft:snowflake ~ ~1 ~ 0.2 0.1 0.2 0 5 normal @a')
+    if self.water > 0:
+        self.water -= 1
+        if self.water <= 0:
+            self.waterS -= 1
+            if self.waterS > 0:
+                self.water = 10
+
+        run('particle minecraft:block_crumble{block_state:"water"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
+    if self.electric > 0:
+        self.electric -= 1
+        if self.electric <= 0:             
+            self.electricS -= 1
+            if self.electricS > 0:
+                self.electric = 10
+
+        run('particle minecraft:electric_spark ~ ~1 ~ 0.2 0.1 0.2 0 5 normal @a')
+    if self.nature > 0:
+        self.nature -= 1
+        if self.nature <= 0: 
+            self.natureS -= 1
+            if self.natureS > 0:
+                self.nature = 10
+
+        run('particle minecraft:block_crumble{block_state:"oak_leaves"} ~ ~1.2 ~ 0.2 0.1 0.2 0 5 normal @a')
+
 
     ## REACTION TICKS
 
@@ -1709,10 +1758,102 @@ def genericEntityTick():
         self.health = self.max_health
 
     if entity('@s[type=evoker_fangs,nbt={Warmup:-9}]'):
-        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', set(self.takedmg, 50))
-        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', set(self.electricS, 1))
-        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', multiply(self.takedmg, self.takeem))
-        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', doNatureDMG)
+        execute('as @e[type=!evoker,type=!evoker_fangs,tag=!notmob,type=!vex,distance=..1.5]', (
+            set(self.takedmg, 50),
+            set(self.electricS, 1),
+            multiply(self.takedmg, self.takeem),
+            doNatureDMG()
+        ))
+
+def bloom():
+    # Intended for use by the player running the command
+    self.temp = 0
+    execute('at @e[type=slime,distance=..4,tag=bloomCore]', add(self.temp, 1))
+    if self.temp >= 4:
+        execute('as @e[type=slime,distance=..4,sort=random,limit=1,tag=bloomCore]', explodeBloom)
+
+    run('summon slime ~ ~ ~ {CustomNameVisible:1b,NoAI:1b,Health:1024f,Size:0,Tags:["bloomCore","notmob","notdone"],CustomName:"Bloom Core",attributes:[{id:"minecraft:max_health",base:1024}]}')
+
+    execute('as @n[type=slime,tag=bloomCore,tag=notdone]', (
+        # Set own stats
+        set(self.em, '@p'.em),
+        set(self.stat.nature, '@p'.stat.nature),
+        set(self.level, '@p'.lvl),
+        removetag(self, 'notdone')
+    ))
+
+def explodeBloom():
+    run('particle minecraft:explosion')
+    # Calculate DMG
+    # EM * (1 + LVL / 10) * (1 + DMG Bonus)
+    self.dmg = 100 # Base DMG
+    self.dmg *= self.em
+    self.dmg *= (10 + self.level) # x10
+    self.dmg *= (100 + self.stat.nature) # x100
+    self.dmg /= 1000 # Cancel x10 x100
+
+
+    # Set takedmg
+    "@e[tag=!notmob,distance=..3.5]".takedmg = self.dmg
+
+    # 90% less for players
+    "@a[distance=..3.5]".takedmg = 10
+
+    execute('as @e[tag=!notmob,distance=..3.5]', doReactionDMG)
+    
+    # Kill bloom core
+    if entity('@s[tag=bloomCore]'):
+        tp(self, '0 0 0'); kill(self)
+
+def bloomCoreTick():
+    if entity('@s[tag=hyperbloom]'):
+        # If no mobs exists, kill
+        if not entity('@e[tag=mob,distance=..15]'):
+            kill(self)
+
+        # Track
+        execute('facing entity @n[tag=mob] feet', tp(self, '^ ^ ^0.5 ~ ~'))
+
+        # Particle
+        run('particle glow ~ ~0.5 ~ 0.1 0.1 0.1 0 20')
+
+        execute('as @e[tag=mob,distance=..1]', (
+            # Do DMG
+            set(self.takedmg, '@n[type=marker,tag=notdone,tag=hyperbloom]'.dmg),
+            run('particle block{block_state:"oak_leaves"} ~ ~0.9 ~ 0.1 0.3 0.1 0 100'),
+            doReactionDMG(),
+            kill('@n[type=marker,tag=notdone,tag=hyperbloom]'),
+        ))
+
+    else:
+        if self.fireS > 0:
+            # Burgeon
+            # We can multiply EM by 2 to achieve 2x more DMG
+            self.em *= 2
+            explodeBloom()
+            displayreaction({"Name": '"Burgeon"', "Color": '"gold"'})
+        if self.electricS > 0:
+            # Hyperbloom
+            # Precalculate the DMG and store it to the new hyperbloom projectile
+            self.dmg = 300 # Base DMG, x3
+            self.dmg *= self.em
+            self.dmg *= (10 + self.level) # x10
+            self.dmg *= (100 + self.stat.nature) # x100
+            self.dmg /= 1000 # Cancel x10 x100
+
+            displayreaction({"Name": '"Hyperbloom"', "Color": '"#8800FF"'})
+
+            summon(marker, '~ ~ ~', {"Tags": "[notmob, hyperbloom, bloomCore, notdone]"}) # Still use bloom core for ticking
+            # Copy DMG
+            '@n[type=marker,tag=notdone,tag=hyperbloom]'.dmg = self.dmg
+
+            tp(self, '0 0 0'); kill(self)
+
+
+    # Explode after 4s. That includes hyperbloom as well (only way hyperbloom projectile explodes)
+    self.life += 1
+    if self.life >= 80:
+        explodeBloom()
 
 def onnewentity():
     tag(self, 'done')
@@ -1739,7 +1880,7 @@ def onnewentity():
         self.max_health = 500
         self.defense = 20
         self.max_shields = 1000
-        run('item replace entity @s weapon.mainhand with bow[enchantments={unbreaking:3,power:3}]')
+        run('item replace entity @s weapon.mainhand with bow[enchantments={unbreaking:3}]')
     elif entity('@s[type = pillager]'):
         self.max_health = 450
         self.defense = 350
@@ -2375,7 +2516,7 @@ def tickmodifiers():
         self.stat.dmgbonus -= 33
 
     # Slot 4: Status-related mods
-    execute('if entity @s[nbt={Inventory:[{Slot:13b, components:{"minecraft:custom_data":{ModID: "Elemental Composition"}}}]}]', add(self.em, 6))
+    execute('if entity @s[nbt={Inventory:[{Slot:13b, components:{"minecraft:custom_data":{ModID: "Elemental Composition"}}}]}]', add(self.em, 8))
     execute('if entity @s[nbt={Inventory:[{Slot:13b, components:{"minecraft:custom_data":{ModID: "Ice Superiority"}}}]}]', mod_IS)
     def mod_IS():
         self.stat.ice += 100
@@ -2384,7 +2525,7 @@ def tickmodifiers():
         add(self.stat.electric, 100), sub(self.stat.water, 50)
     ))
 
-    execute('if entity @s[nbt={Inventory:[{Slot:13b, components:{"minecraft:custom_data":{ModID: "Master\'s Composition"}}}]}]', mult(self.em, 1.35))
+    execute('if entity @s[nbt={Inventory:[{Slot:13b, components:{"minecraft:custom_data":{ModID: "Master\'s Composition"}}}]}]', mult(self.em, 1.5))
 
     # Slot 5
     execute('if entity @s[nbt={Inventory:[{Slot:14b, components:{"minecraft:custom_data":{ModID: "Catalyzing Shields"}}}]}]', sub(self.stat.maxshields, 75))
@@ -2481,7 +2622,7 @@ def commonmod():
     if self.temp == 0: givecmod({"name": '"Serration"', "slot": 1, "desc": '"+75% Base DMG"'})
     if self.temp == 1: givecmod({"name": '"Shattering Hits"', "slot": 2, "desc": '"+120% Critical Chance"'})
     if self.temp == 2: givecmod({"name": '"Target Cracker"', "slot": 3, "desc": '"+120% Critical Damage"'})
-    if self.temp == 3: givecmod({"name": '"Elemental Composition"', "slot": 4, "desc": '"+6 Elemental Mastery"'})
+    if self.temp == 3: givecmod({"name": '"Elemental Composition"', "slot": 4, "desc": '"+8 Elemental Mastery"'})
     if self.temp == 4: givecmod({"name": '"Enhanced Vitality"', "slot": 6, "desc": '"+100% Maximum Health, +100% Defense"'})
     if self.temp == 5: givecmod({"name": '"Enhanced Deflection"', "slot": 6, "desc": '"+200% Maximum Shields, +500 Shields"'})
 
@@ -2505,14 +2646,15 @@ def raremod():
     if self.temp == 0: givermod({"name": '"Crispy Hits"', "slot": 1, "desc": '"Each Ice stack the entity has increases Base DMG by +30%"'})
     if self.temp == 1: givermod({"name": '"Steel Blade"', "slot": 2, "desc": '"Non-critical hits increase Critical Steel counter by 1. Each Critical Steel counter adds a +20% final Critical Chance to attacks. Critical hits halve Critical Steel counter."'})
     if self.temp == 2: givermod({"name": '"Nature\'s Revenge"', "slot": 3, "desc": '"Each Nature stack the entity has increases Critical Damage by +15%, up to +120%. Each Critical hit deals 15 Nature DMG if the entity has the Nature status."'})
-    if self.temp == 4: givermod({"name": '"Master\'s Composition"', "slot": 4, "desc": '"Increases current Elemental Mastery by 35%"'})
+    if self.temp == 4: givermod({"name": '"Master\'s Composition"', "slot": 4, "desc": '"Increases current Elemental Mastery by 50%"'})
     if self.temp == 5: givermod({"name": '"Biotic Hits"', "slot": 4, "desc": '"On a Critical Hit: 30% to apply Viral to the entity hit."'})
     if self.temp == 6: givermod({"name": '"Catalyzing Shields"', "slot": 5, "desc": '"-75% Maximum Shields. The invincibility duration after Shields is broken is fixed at 0.6s."'})
-    if self.temp == 7: givermod({"name": '"Electrical Shields"', "slot": 6, "desc": '"Duration of Magnetized is halved. While DMG is taken to Shields: Emit a small pulse, which deals 50 Electric DMG to nearby mobs within 2.5m"'})
+    if self.temp == 7: givermod({"name": '"Electrical Shields"', "slot": 6, "desc": '"Duration of Magnetized is halved. While DMG is taken to Shields: Emit a small pulse, which deals 200 Electric DMG to nearby mobs (including Bloom Cores) within 3m"'})
     if self.temp == 8: givermod({"name": '"Blessing of the Sea"', "slot": 2, "desc": '"Each water stack the entity has increases Critical Chance by +50%"'})
 
 def tick():
     execute('as @e[tag=!notmob] at @s', genericEntityTick)
+    execute('as @e[tag=bloomCore] at @s', bloomCoreTick)
     execute('as @e[type=text_display,tag=dmgtext]', dmgtextanimation)
     execute('as @e[type=interaction,tag=joinmsg] if data entity @s interaction on target', (
         run('trigger start'),
@@ -2554,10 +2696,7 @@ def shopphase():
         failed = 0
 
     all.coins += temp
-    if level < 3:
-        print(f"#light_purple#Shop phase! You have 10s to shop until your next round!")
-        schedule('10s', newfloor)
-    elif level < 4:
+    if level < 4:
         print(f"#light_purple#Shop phase! You have 15s to shop until your next round!")
         schedule('15s', newfloor)
     else:
@@ -2629,9 +2768,12 @@ def shop():
         if shopphase2 == 23:  run('data modify storage kcf:functionargs shop set from storage kcs:weapons diamondsword_electric.shopdata\nfunction kcf:shopweapon2 with storage kcf:functionargs shop')
         if shopphase2 == 24:  run('data modify storage kcf:functionargs shop set from storage kcs:weapons diamondsword_nature.shopdata\nfunction kcf:shopweapon2 with storage kcf:functionargs shop')
     else:
-        run('tellraw @a [{"text":"Iron Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 12"},"hover_event":{"action":"show_item", "id": "wooden_sword", "count": 1, "components":{custom_name:[{"text":"Iced Copper Sword","italic":false}],lore:[[{"text":"The standard sword wielded by many major swordsman with its decent DMG, status chance, and its critical abilities. Highly recommended for your first weapon.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 185","italic":false,"color":"gray"}],[{"text":"Base Status: 25%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 20%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [100 Coins]","color":"aqua"}]')        
-        run('tellraw @a [{"text":"Flaming Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 13"},"hover_event":{"action":"show_item", "id": "wooden_sword", "count": 1, "components":{custom_name:[{"text":"Iced Gold Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [50 Coins]","color":"aqua"}]')        
-        run('tellraw @a [{"text":"Iced Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 11"},"hover_event":{"action":"show_item", "id": "wooden_sword", "count": 1, "components":{custom_name:[{"text":"Iced Gold Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [50 Coins]","color":"aqua"}]')        
+        run('tellraw @a [{"text":"Iron Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 12"},"hover_event":{"action":"show_item", "id": "iron_sword", "count": 1, "components":{custom_name:[{"text":"Iron Sword","italic":false}],lore:[[{"text":"The standard sword wielded by many major swordsman with its decent DMG, status chance, and its critical abilities. Highly recommended for your first weapon.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 185","italic":false,"color":"gray"}],[{"text":"Base Status: 25%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 20%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [50 Coins]","color":"aqua"}]')        
+        run('tellraw @a [{"text":"Flaming Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 13"},"hover_event":{"action":"show_item", "id": "copper_sword", "count": 1, "components":{custom_name:[{"text":"Flaming Copper Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [20 Coins]","color":"aqua"}]')        
+        run('tellraw @a [{"text":"Iced Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 11"},"hover_event":{"action":"show_item", "id": "copper_sword", "count": 1, "components":{custom_name:[{"text":"Iced Copper Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [20 Coins]","color":"aqua"}]')        
+        run('tellraw @a [{"text":"Hydrous Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 14"},"hover_event":{"action":"show_item", "id": "copper_sword", "count": 1, "components":{custom_name:[{"text":"Hydrous Copper Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [20 Coins]","color":"aqua"}]')        
+        run('tellraw @a [{"text":"Shocking Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 15"},"hover_event":{"action":"show_item", "id": "copper_sword", "count": 1, "components":{custom_name:[{"text":"Shocking Copper Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [20 Coins]","color":"aqua"}]')        
+        run('tellraw @a [{"text":"Nurturous Copper Sword","color":"yellow","click_event":{"action":"run_command","command":"/trigger buy set 16"},"hover_event":{"action":"show_item", "id": "copper_sword", "count": 1, "components":{custom_name:[{"text":"Nurturous Copper Sword","italic":false}],lore:[[{"text":"A standard sword that is very conductive but lacks the standard damage output. Recommended to get this only after beating Floor 5.","italic":false,"color":"gray"}],"",[{"text":"Base DMG: 30","italic":false,"color":"gray"}],[{"text":"Base Status: 75%","italic":false,"color":"gray"}],[{"text":"Base Critical Chance: 15%","italic":false,"color":"gray"}],[{"text":"Base Critical Damage: 50%","italic":false,"color":"gray"}],[{"text":"Base Attack Speed: 1.6/s","italic":false,"color":"gray"}]],attribute_modifiers:[{type:attack_damage,amount:-0.81,slot:mainhand,id:"weapon_atkdecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:-4,slot:mainhand,id:"weapon_atkspddecrease",display:{type:"hidden"},operation:add_value},{type:attack_speed,amount:1.6,slot:mainhand,id:"weapon_atkspdmod",operation:add_value}]}}},{"text":" [20 Coins]","color":"aqua"}]')        
 
     def shopweapon1(Name, Cost, ItemData): run(f'tellraw @a [{{"text":"{Name}","color":"yellow","click_event":{{"action":"run_command","command":"/trigger buy set 11"}},"hover_event":{ItemData}}},{{"text":" [{Cost} Coins]","color":"aqua"}}]')
     def shopweapon2(Name, Cost, ItemData): run(f'tellraw @a [{{"text":"{Name}","color":"yellow","click_event":{{"action":"run_command","command":"/trigger buy set 12"}},"hover_event":{ItemData}}},{{"text":" [{Cost} Coins]","color":"aqua"}}]')
@@ -2727,7 +2869,16 @@ def triggers__buy():
                 buy({"Cost": 100, "Command": '"function kcf:giveweapon {ID: \\"ironsword\\"}"'})
         elif self.buy == 13: 
             if level < 5:    
-                buy({"Cost": 50, "Command": '"function kcf:giveweapon {ID: \\"coppersword_fire\\"}"'})
+                buy({"Cost": 20, "Command": '"function kcf:giveweapon {ID: \\"coppersword_fire\\"}"'})
+        elif self.buy == 14: 
+            if level < 5:    
+                buy({"Cost": 20, "Command": '"function kcf:giveweapon {ID: \\"coppersword_water\\"}"'}) 
+        elif self.buy == 15: 
+            if level < 5:    
+                buy({"Cost": 20, "Command": '"function kcf:giveweapon {ID: \\"coppersword_electric\\"}"'})
+        elif self.buy == 16: 
+            if level < 5:    
+                buy({"Cost": 20, "Command": '"function kcf:giveweapon {ID: \\"coppersword_nature\\"}"'})
 def buy(Cost: int, Command: str):
     run('''
 $scoreboard players set @s temp $(Cost)
@@ -2850,18 +3001,17 @@ def newfloor():
             if level == 6:
                 for i in range(3): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
             if level == 7:
-                for i in range(3): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
-                for i in range(5): summon(zombie, '0 100 0', {'Tags': '[spawnNotDone]'})
+                for i in range(2): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
+                for i in range(3): summon(zombie, '0 100 0', {'Tags': '[spawnNotDone]'})
             if level == 8:
-                for i in range(5): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
+                for i in range(4): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
             if level == 9:
-                for i in range(3): summon(skeleton, '0 100 0', {'Tags': '[spawnNotDone]'})
                 for i in range(8): summon(husk, '0 100 0', {'Tags': '[spawnNotDone]'})
             if level == 10:
                 summon(evoker, '0 100 0', {'Tags': '[spawnNotDone, boss, gigantic]'})
             if level == 11:
-                for i in range(5): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
-                for i in range(5): summon(skeleton, '0 100 0', {'Tags': '[spawnNotDone]'})
+                for i in range(2): summon(pillager, '0 100 0', {'Tags': '[spawnNotDone]', 'equipment': '{mainhand:{id: crossbow}}'})
+                for i in range(3): summon(skeleton, '0 100 0', {'Tags': '[spawnNotDone]'})
             if level == 12:
                 summon(stray, '0 100 0', {'Tags': '[spawnNotDone, gigantic, elite]'})
             if level == 13:
@@ -2951,7 +3101,7 @@ def newfloor():
                 summon(vindicator, '0 100 0', {'Tags': '[spawnNotDone]'})            
 
             if level == 40:
-                summon(pillager, '0 100 0', {'Tags': '[spawnNotDone, gigantic, naturePillager, boss, pillagerDone]', 'equipment': '{mainhand:{id: crossbow, components: {unbreakable: {},enchantments: {multishot: 10}}}}'})
+                summon(pillager, '0 100 0', {'Tags': '[spawnNotDone, gigantic, naturePillager, boss, pillagerDone, titan]', 'equipment': '{mainhand:{id: crossbow, components: {unbreakable: {},enchantments: {multishot: 10}}}}'})
 
         run('spreadplayers 8 8 8 16 under -32 false @e[tag=spawnNotDone]')
         # Sometimes it might fail, in that case, just TP to mid

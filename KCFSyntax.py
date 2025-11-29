@@ -58,13 +58,13 @@ def label(Label: str, Value: str):
     Example: `_spawn = "0 0 0"`
     """
 
-def execute(*, Values: str, Function: function):
+def execute(*, Values: str, Function: function | tuple[function]):
     """
     Executes a function.
 
     Example: `execute("as @a at @s", my_function)`
 
-    Example 2: `execute("postitioned ~ ~ ~", "as @a", my_function)`
+    Example 2: `execute("postitioned ~ ~ ~", "as @a", (set(self.var, 1), my_function()))`
     """
 
 
@@ -260,7 +260,7 @@ def tellraw(Player: Player, Message: FormattedString | str):
     """
     Tells a player a message in chat.
 
-    Example: `tellraw(self, "#bold,red#Your current score is {self.score}")`
+    Example: `tellraw(self, f"#bold,red#Your current score is {self.score}")`
     """
 
 def actionbar(Player: Player, Message: FormattedString | str):
@@ -269,7 +269,7 @@ def actionbar(Player: Player, Message: FormattedString | str):
     
     Example: 
     ```
-    actionbar(self, "#bold,red#Your current score is {self.score}")
+    actionbar(self, f"#bold,red#Your current score is {self.score}")
     ```
     """
 
@@ -282,7 +282,7 @@ def title(Player: Player, Message: FormattedString | str):
     Example: 
     ```
     times(self, 5, 20, 5)
-    title(self, "#bold,red#Your current score is {self.score}")
+    title(self, f"#bold,red#Your current score is {self.score}")
     ```
     """
 

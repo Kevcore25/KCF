@@ -1,4 +1,5 @@
 import ast, json, os, re
+from fractions import Fraction
 
 # Version stuff
 VERSION = 5.0
@@ -11,12 +12,13 @@ VERSION_HIGHLIGHTS = """
 * Build/Writing files is now a built-in function 
 """
 
+# Default pack version this program is made for
 PACK_VERSION = 80
 
 # Turn debug mode on or off
 # Debug mode prints various AST and internal variable information
 # For larger projects, this should be off or it will slow down the build process
-DEBUG = True
+DEBUG = False
 
 colors = {
     'red':'red',
@@ -495,6 +497,8 @@ class KCF:
         # If it is negative it is a unary op for some reason
         if isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub):
             return -value.operand.value
+        elif isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.UAdd):
+            return value.operand.value
         elif not (isinstance(value, ast.Constant) and isinstance(value.value, int)) and not allowNonInt:
             self.raise_error(None, "Value must be a valid integer!", ast.unparse(value))
         return value.value
@@ -794,7 +798,7 @@ class KCF:
         return y, n
     
     def is_int(self, value: ast.Constant | ast.UnaryOp) -> True:
-        return (isinstance(value, ast.Constant) and isinstance(value.value, int)) or (isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub) and isinstance(value.operand, ast.Constant))
+        return (isinstance(value, ast.Constant) and isinstance(value.value, int)) or (isinstance(value, ast.UnaryOp) and (isinstance(value.op, ast.USub) or isinstance(value.op, ast.UAdd)) and isinstance(value.operand, ast.Constant))
     
     def parse_condition(self, condition, starting = 'execute ', opp = False):
         """
@@ -812,40 +816,41 @@ class KCF:
                 # Cool edge case: If left and right are ints, AND they are ALL LTs()
                 # This utilizes Minecraft's a..b system, which may optimize things
                 # Otherwise, the else statement will activate 
+
+                # We can optimize the 4 if statements by precalc repeated conditions
+                absysValid = len(value.ops) == 2 and (self.is_int(value.left) and self.is_int(value.comparators[1]))
                 if (
                     # 2 Lts()
-                    len(value.ops) == 2 and isinstance(value.ops[0], ast.Lt) and isinstance(value.ops[1], ast.Lt) and
-                    # Left & Rights are INTS
-                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                    absysValid and 
+                    isinstance(value.ops[0], ast.Lt) and isinstance(value.ops[1], ast.Lt)
                 ):
                     entity, varName = self.parse_var(value.comparators[0])
                     temp += (f"{y} score {entity} {varName} matches {self.get_int(value.left) + 1}..{self.get_int(value.comparators[1]) - 1} ")
                 elif (
                     # 2 Gts() - same thing but reverse
-                    len(value.ops) == 2 and isinstance(value.ops[0], ast.Gt) and isinstance(value.ops[1], ast.Gt) and
-                    # Left & Rights are INTS
-                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                    absysValid and 
+                    isinstance(value.ops[0], ast.Gt) and isinstance(value.ops[1], ast.Gt)
+                    
                 ):
                     entity, varName = self.parse_var(value.comparators[0])
                     temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[1]) + 1}..{self.get_int(value.left) - 1} ")
                 elif (
                     # 2 LtEs()
-                    len(value.ops) == 2 and isinstance(value.ops[0], ast.LtE) and isinstance(value.ops[1], ast.LtE) and
-                    # Left & Rights are INTS
-                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                    absysValid and 
+                    isinstance(value.ops[0], ast.LtE) and isinstance(value.ops[1], ast.LtE)
                 ):
                     entity, varName = self.parse_var(value.comparators[0])
                     temp += (f"{y} score {entity} {varName} matches {self.get_int(value.left)}..{self.get_int(value.comparators[1])} ")
                 elif (
                     # 2 GtEs() - same thing but reverse
-                    len(value.ops) == 2 and isinstance(value.ops[0], ast.GtE) and isinstance(value.ops[1], ast.GtE) and
-                    # Left & Rights are INTS
-                    (self.is_int(value.left) and self.is_int(value.comparators[1]))
+                    absysValid and 
+                    isinstance(value.ops[0], ast.GtE) and isinstance(value.ops[1], ast.GtE)
                 ):
                     entity, varName = self.parse_var(value.comparators[0])
                     temp += (f"{y} score {entity} {varName} matches {self.get_int(value.comparators[1])}..{self.get_int(value.left)} ")
                 else:
                     entity, varName = self.parse_var(value.left)
+
                     for i in range(len(value.ops)):
                         if isinstance(value.comparators[i], ast.Constant) or isinstance(value.comparators[i], ast.UnaryOp):
                             if isinstance(value.ops[i], ast.Eq):
@@ -885,35 +890,58 @@ class KCF:
                         temp += value.args[0].value + " "
 
             elif isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.Not):
+                # Convert Boolean operators
+                def switch(v):
+                    if isinstance(v.op, ast.Or):
+                        v.op = ast.And()
+                    elif isinstance(v.op, ast.And):
+                        v.op = ast.Or()
+                    else:
+                        self.raise_error(None, "Operator not allowed! Must be either AND or OR")
+
+                # Switch for base case
+                def switchIfBoolOp(v):
+                    if isinstance(v, ast.BoolOp):
+                        switch(v)
+
+                        # Switch for all inner ones
+                        for i in range(len(v.values)):
+                            switchIfBoolOp(v.values[i])
+
+                switchIfBoolOp(value.operand)
+
                 return cmpre(value.operand, not opp)
             elif isinstance(value, ast.BoolOp):
                 if isinstance(value.op, ast.And):
                     for v in value.values:
                         cmpre(v, opp)
                 elif isinstance(value.op, ast.Or):
-                    # Plan: 
-                    # Iterate through the list values=[Name, Name, etc]
-                    # At I, opp is CURRENT but opp is NOT CURRENT for others
-                    add = False
-                    cmds = []
-                    for i in range(len(value.values)):
-                        temp = ''
-                        for j in range(len(value.values)):
-                            cmpre(value.values[j], opp = (opp if i == j else not opp))
+                    # # Plan: 
+                    # # Iterate through the list values=[Name, Name, etc]
+                    # # At I, opp is CURRENT but opp is NOT CURRENT for others
+                    # add = False
+                    # cmds = []
+                    # # Get the current temp (e.g. execute if score #global a matches 1.. )
+                    # beforetemp = temp
+                    # for i in range(len(value.values)):
+                    #     temp = ''
+                    #     for j in range(len(value.values)):
+                    #         cmpre(value.values[j], opp = (opp if i == j else not opp))
 
-                        cmds.append(
-                            starting + temp + '%end%'
-                        )
+                    #     cmds.append(
+                    #         beforetemp + temp + '%end%'
+                    #     )
                     
-                    temp = '\n'.join(cmds)
+                    # temp = '\n'.join(cmds)
 
+                    add = False
+                    a = []
+                    temp = ''
+                    for v in value.values:
+                        a.append(self.parse_condition(v))
+                    temp += '\n'.join(a)
 
-                    """
-            BoolOp(op=Or(), values=[
-                Name(id='a', ctx=Load()), 
-                Name(id='b', ctx=Load())
-            ]),
-                    """
+                                    
             elif isinstance(value, ast.Constant):
                 if isinstance(value.value, str):
                     temp += f"{y} {value.value} "
@@ -1059,19 +1087,26 @@ class KCF:
                         else:
                             precision = digits
 
-                        rvalue = round(value * (10 ** precision))
+                        demoninator = 10 ** precision
+                        numerator = round(value * demoninator)
                         
                         if isinstance(expression.op, ast.Mult):
                             a, b = '*', '/'
                         else:
                             a, b = '/', '*'
 
-                        for i in (rvalue, 10**precision):
+
+
+                        # Simplify using the Fraction module
+                        frac = Fraction(numerator, demoninator)
+
+                        for i in (frac.numerator, frac.denominator):
                             if i not in self.pNumbers:
-                                self.pNumbers.append(i) 
+                                self.pNumbers.append(i)   
+
                         return (
-                            f"scoreboard players operation {entity} {varName} {a}= {rvalue} p-numbers\n" + 
-                            f"scoreboard players operation {entity} {varName} {b}= {10 ** precision} p-numbers" 
+                            f"scoreboard players operation {entity} {varName} {a}= {frac.numerator} p-numbers\n" + 
+                            f"scoreboard players operation {entity} {varName} {b}= {frac.denominator} p-numbers" 
                         )
                     else:
                         if value not in self.pNumbers:
@@ -1440,9 +1475,46 @@ class KCF:
                     # By using @, the print function fails to print these custom files
 
                     # Creating files is later. This only gets the contents and the path
-                    string = expression.value.value
+                    string: str = expression.value.value
 
-                    lines = string.strip().splitlines()
+                    if string.strip().lstrip('').startswith("@run"):
+                        # First get the minimium width space
+                        minWidth = None
+                        for ln in string.splitlines()[1:]:
+                            if ln == '': continue
+
+                            c = 0
+                            for t in ln:
+                                if t == ' ':
+                                    c += 1
+                                else: 
+                                    break
+                            if minWidth is None: 
+                                minWidth = c
+
+                            elif c < minWidth:
+                                minWidth = c
+
+                        # Piece together a new code version
+                        code = []
+                        for ln in string.splitlines()[1:]:
+                            code.append(ln[minWidth:])
+                        
+                        # Run code
+                        execCode = "code = []\ndef run(c):\n global code\n code.append(c)" + '\n'.join(code)
+
+                        globalVars = {}
+
+                        exec(
+                            execCode,
+                            globalVars, {}
+                        )
+                        
+                        print("Locals", globalVars)
+                        cmds.append('\n'.join(globalVars['code']))
+
+
+                    lines: list[str] = string.strip().splitlines()
 
                     path = None
                     contents = []
@@ -1780,7 +1852,11 @@ class KCF:
         print(f"Characters Saved: {totalChar - nowchar} ({nowchar} chars in code compared to {totalChar} chars in MCF)")
         print(f"Lines Saved: {lns - nowlns} ({nowlns} lines in code compared to {lns} lines in MCF)")
 
-    def write_files(self, name: str = ".", description: str = "Made with PyMCF"):
+    def write_files(self, 
+        name: str = ".", 
+        description: str = "Made with PyMCF",
+        pack_version: int = PACK_VERSION
+    ):
         def mkfile(file: str, value: str = ""):
             with open(file, "w") as f:
                 f.write(value)
@@ -1794,7 +1870,7 @@ class KCF:
         mkdir(os.path.join(name, "data"))
         mkfile(os.path.join(name, "pack.mcmeta"), json.dumps({
             "pack": {
-                "pack_format": PACK_VERSION,
+                "pack_format": pack_version,
                 "description": description
             }
         }, indent=4))
